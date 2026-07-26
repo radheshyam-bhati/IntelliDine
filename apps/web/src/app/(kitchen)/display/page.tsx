@@ -31,6 +31,12 @@ export default function KitchenDisplayPage() {
   }, [])
 
   useEffect(() => {
+    const controller = new AbortController()
+    let socket: ReturnType<typeof connect> | null = null
+    controller.signal.addEventListener('abort', () => {
+      if (socket) socket.disconnect()
+    })
+
     async function init() {
       try {
         setLoading(true)
@@ -48,10 +54,12 @@ export default function KitchenDisplayPage() {
         setLoading(false)
       }
 
+      if (controller.signal.aborted) return
+
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token || ''
 
-      const socket = connect('', token)
+      socket = connect('', token)
 
       socket.on('order:created', (order) => {
         setOrders((prev) => [...prev, order])
@@ -64,13 +72,13 @@ export default function KitchenDisplayPage() {
           )
         )
       })
-
-      return () => {
-        socket.disconnect()
-      }
     }
 
     init()
+
+    return () => {
+      controller.abort()
+    }
   }, [])
 
   const handleStatusChange = useCallback(

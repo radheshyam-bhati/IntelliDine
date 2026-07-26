@@ -42,11 +42,11 @@ export default function AdminDashboardPage() {
     if (!aiQuery.trim()) return
     setAiLoading(true)
     setAiResponse(null)
-    const res = await post<{ response: string }>('/ai/query', {
-      query: aiQuery,
+    const res = await post<{ answer: string; dataSource: string }>('/ai/query', {
+      question: aiQuery,
     })
     if (res.success && res.data) {
-      setAiResponse(res.data.response)
+      setAiResponse(res.data.answer)
     } else {
       setAiResponse(res.error || 'Failed to get response')
     }

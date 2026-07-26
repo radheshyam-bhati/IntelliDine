@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { MenuCategory, MenuItem } from '@kitchensync/shared'
 import MenuItemCard from '@/components/MenuItemCard'
 import CartBar from '@/components/CartBar'
@@ -155,25 +156,54 @@ export default function CustomerMenuPage() {
         </div>
       )}
 
-      <div className="px-4 py-8">
-        <h1 className="font-serif text-4xl text-gray-900 mb-2">Menu</h1>
+      <div className="px-4 pt-8 pb-6">
+        <h1 className="font-serif text-4xl text-gray-900 tracking-tight">Menu</h1>
         {tableId && (
-          <p className="text-sm text-amber-700">Table {tableId}</p>
+          <p className="mt-1 text-sm text-amber-700 font-medium">
+            Table {tableId}
+          </p>
         )}
+        <div className="h-px bg-amber-200/60 mt-4" />
+        <div className="flex flex-wrap gap-2 mt-4">
+          <Link
+            href={`/menu/${slug}/queue`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M7 4v4M7 10v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            Join Waitlist
+          </Link>
+          <Link
+            href={`/menu/${slug}/reserve`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="1" y="2" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M1 5h12M4 1v2M10 1v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            Make a Reservation
+          </Link>
+        </div>
       </div>
 
       {recommendations.length > 0 && (
-        <section className="mb-8">
+        <section className="mb-10">
           <div className="px-4 mb-4">
-            <h2 className="font-serif text-2xl text-amber-800 border-b border-amber-300 pb-2">
-              Popular
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="font-serif text-2xl text-amber-800">Popular</h2>
+              <div className="flex-1 h-px bg-amber-200/60" />
+            </div>
+            <p className="text-xs text-amber-600/70 mt-1 ml-0.5">
+              Guest favorites from the past month
+            </p>
           </div>
           <div className="px-4 space-y-3">
             {recommendations.map((item) => (
               <div key={item.id} className="relative">
                 {item.order_count && item.order_count >= 10 && (
-                  <span className="absolute -top-1 -right-1 z-10 bg-amber-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="absolute -top-1 -right-1 z-10 bg-amber-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
                     Hot
                   </span>
                 )}
@@ -195,11 +225,14 @@ export default function CustomerMenuPage() {
         <p className="text-center text-gray-400 py-12">No menu items available</p>
       ) : (
         categories.map((category) => (
-          <section key={category.id} className="mb-8">
-            <div className="px-4 mb-4">
-              <h2 className="font-serif text-3xl text-gray-800 border-b border-amber-200 pb-2">
-                {category.name}
-              </h2>
+          <section key={category.id} className="mb-10">
+            <div className="px-4 mb-5">
+              <div className="flex items-center gap-3">
+                <h2 className="font-serif text-3xl text-gray-800 tracking-tight">
+                  {category.name}
+                </h2>
+                <div className="flex-1 h-px bg-amber-200/40" />
+              </div>
             </div>
             <div className="px-4 space-y-3">
               {category.items.map((item) => (

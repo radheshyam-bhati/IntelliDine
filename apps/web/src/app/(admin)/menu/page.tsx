@@ -11,7 +11,15 @@ export default function AdminMenuPage() {
   const [loading, setLoading] = useState(true)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [showAddCategory, setShowAddCategory] = useState(false)
+  const [showAddItem, setShowAddItem] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [newItem, setNewItem] = useState<Partial<MenuItem>>({
+    name: '',
+    description: '',
+    price: 0,
+    category_id: '',
+    dietary_tags: [],
+  })
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
@@ -51,6 +59,26 @@ export default function AdminMenuPage() {
       showSuccess('Category added')
     } else {
       setError(res.error || 'Failed to add category')
+    }
+  }
+
+  const handleAddItem = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!newItem.name || !newItem.category_id) return
+    setError(null)
+    const res = await post<MenuItem>('/menu-items', {
+      name: newItem.name,
+      description: newItem.description || '',
+      price: newItem.price || 0,
+      category_id: newItem.category_id,
+    })
+    if (res.success && res.data) {
+      setItems((prev) => [...prev, res.data!])
+      setNewItem({ name: '', description: '', price: 0, category_id: '', dietary_tags: [] })
+      setShowAddItem(false)
+      showSuccess('Menu item created')
+    } else {
+      setError(res.error || 'Failed to create menu item')
     }
   }
 
@@ -115,12 +143,6 @@ export default function AdminMenuPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Menu Management</h1>
-        <button
-          onClick={() => setShowAddCategory(!showAddCategory)}
-          className="min-touch rounded-md bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-800"
-        >
-          {showAddCategory ? 'Cancel' : 'Add Category'}
-        </button>
       </div>
 
       {error && (
@@ -134,6 +156,32 @@ export default function AdminMenuPage() {
           {successMsg}
         </div>
       )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => {
+            setShowAddItem(!showAddItem)
+            setShowAddCategory(false)
+          }}
+          className={`min-touch rounded-md px-4 py-2 text-sm font-medium ${
+            showAddItem
+              ? 'bg-gray-100 text-gray-600'
+              : 'bg-amber-600 text-white hover:bg-amber-700'
+          }`}
+        >
+          {showAddItem ? 'Cancel' : 'Add Item'}
+        </button>
+        <button
+          onClick={() => setShowAddCategory(!showAddCategory)}
+          className={`min-touch rounded-md px-4 py-2 text-sm font-medium ${
+            showAddCategory
+              ? 'bg-gray-100 text-gray-600'
+              : 'bg-gray-900 text-white hover:bg-gray-800'
+          }`}
+        >
+          {showAddCategory ? 'Cancel' : 'Add Category'}
+        </button>
+      </div>
 
       {showAddCategory && (
         <form onSubmit={handleAddCategory} className="flex gap-2">
@@ -150,6 +198,64 @@ export default function AdminMenuPage() {
             className="min-touch rounded-md bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-800"
           >
             Save
+          </button>
+        </form>
+      )}
+
+      {showAddItem && (
+        <form onSubmit={handleAddItem} className="rounded-lg border border-gray-200 bg-white p-4 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Item Name</label>
+              <input
+                type="text"
+                value={newItem.name || ''}
+                onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                required
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-hidden"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                value={newItem.description || ''}
+                onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                rows={2}
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Price ($)</label>
+              <input
+                type="number"
+                value={newItem.price || ''}
+                onChange={(e) => setNewItem({ ...newItem, price: Number(e.target.value) })}
+                required
+                min="0"
+                step="0.01"
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-hidden"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+              <select
+                value={newItem.category_id || ''}
+                onChange={(e) => setNewItem({ ...newItem, category_id: e.target.value })}
+                required
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-hidden"
+              >
+                <option value="">Select category...</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <button
+            type="submit"
+            className="w-full rounded-md bg-amber-600 text-white px-4 py-2 text-sm font-medium hover:bg-amber-700"
+          >
+            Create Menu Item
           </button>
         </form>
       )}

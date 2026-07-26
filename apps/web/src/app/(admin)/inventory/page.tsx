@@ -4,9 +4,39 @@ import { useState, useEffect, type FormEvent } from 'react'
 import type { Ingredient } from '@kitchensync/shared'
 import { get, post } from '@/lib/api'
 
+interface StockPrediction {
+  id: string
+  name: string
+  unit: string
+  current_stock: number
+  reorder_threshold: number
+  days_remaining: number | null
+  predicted_runout_date: string | null
+  status: 'critical' | 'below_threshold' | 'warning' | 'no_usage_data' | 'ok'
+  below_threshold: boolean
+}
+
+const predictionColors: Record<string, string> = {
+  critical: 'border-red-400 bg-red-50',
+  below_threshold: 'border-orange-400 bg-orange-50',
+  warning: 'border-amber-300 bg-amber-50',
+  no_usage_data: 'border-gray-200 bg-gray-50',
+  ok: 'border-gray-200 bg-white',
+}
+
+const predictionLabels: Record<string, string> = {
+  critical: 'Critical - Running out soon',
+  below_threshold: 'Below Threshold',
+  warning: 'Warning - Will run out within a week',
+  no_usage_data: 'No usage data yet',
+  ok: 'Adequate stock',
+}
+
 export default function AdminInventoryPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
+  const [predictions, setPredictions] = useState<StockPrediction[]>([])
   const [loading, setLoading] = useState(true)
+  const [showPredictions, setShowPredictions] = useState(true)
   const [adjustments, setAdjustments] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
@@ -15,14 +45,20 @@ export default function AdminInventoryPage() {
     async function fetchData() {
       try {
         setLoading(true)
-        const res = await get<Ingredient[]>('/ingredients')
-        if (res.success && res.data) setIngredients(res.data)
+        const [ingRes, predRes] = await Promise.all([
+          get<Ingredient[]>('/ingredients'),
+          get<StockPrediction[]>('/inventory/low-stock/predictions'),
+        ])
+        if (ingRes.success && ingRes.data) setIngredients(ingRes.data)
+        if (predRes.success && predRes.data) setPredictions(predRes.data)
       } finally {
         setLoading(false)
       }
     }
     fetchData()
   }, [])
+
+  const criticalCount = predictions.filter((p) => p.status === 'critical' || p.status === 'below_threshold').length
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg)
@@ -48,6 +84,9 @@ export default function AdminInventoryPage() {
       )
       setAdjustments((prev) => ({ ...prev, [ingredientId]: 0 }))
       showSuccess('Stock adjusted')
+      // Refresh predictions after stock change
+      const predRes = await get<StockPrediction[]>('/inventory/low-stock/predictions')
+      if (predRes.success && predRes.data) setPredictions(predRes.data)
     } else {
       setError(res.error || 'Failed to adjust stock')
     }
@@ -63,9 +102,30 @@ export default function AdminInventoryPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">
-        Inventory Management
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">
+          Inventory Management
+        </h1>
+        <button
+          onClick={() => setShowPredictions(!showPredictions)}
+          className={`min-touch rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            showPredictions
+              ? 'bg-gray-900 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          {showPredictions ? 'Hide Predictions' : 'Show Predictions'}
+        </button>
+      </div>
+
+      {criticalCount > 0 && (
+        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 flex items-center gap-2">
+          <span className="text-red-600 font-bold text-lg">!</span>
+          <p className="text-sm text-red-700">
+            <span className="font-semibold">{criticalCount}</span> ingredient{criticalCount > 1 ? 's' : ''} need{criticalCount === 1 ? 's' : ''} immediate attention
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">

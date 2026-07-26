@@ -23,12 +23,20 @@ export default function StaffOrdersPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const controller = new AbortController()
+    let socket: ReturnType<typeof connect> | null = null
+    controller.signal.addEventListener('abort', () => {
+      if (socket) socket.disconnect()
+    })
+
     async function init() {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token || ''
       const restaurantId = ''
 
-      const socket = connect(restaurantId, token)
+      if (controller.signal.aborted) return
+
+      socket = connect(restaurantId, token)
 
       socket.on('order:created', (order) => {
         setOrders((prev) => [...prev, order])
@@ -58,13 +66,13 @@ export default function StaffOrdersPage() {
           )
         )
       })
-
-      return () => {
-        socket.disconnect()
-      }
     }
 
     init()
+
+    return () => {
+      controller.abort()
+    }
   }, [])
 
   useEffect(() => {
