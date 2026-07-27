@@ -1,214 +1,163 @@
 'use client'
 
-import { useState, useEffect, type FormEvent } from 'react'
-import type { Ingredient } from '@kitchensync/shared'
-import { get, post } from '@/lib/api'
+import React, { useState } from 'react'
+import { Bell, Search, LogOut, Package, BarChart2, Truck, Settings as SettingsIcon } from 'lucide-react'
 
-interface StockPrediction {
-  id: string
-  name: string
-  unit: string
-  current_stock: number
-  reorder_threshold: number
-  days_remaining: number | null
-  predicted_runout_date: string | null
-  status: 'critical' | 'below_threshold' | 'warning' | 'no_usage_data' | 'ok'
-  below_threshold: boolean
-}
+// Import new components
+import { AIAssistantPanel } from './components/AIAssistantPanel'
+import { InventoryOverviewHero } from './components/InventoryOverviewHero'
+import { KPIGrid } from './components/KPIGrid'
+import { InventoryDataTable } from './components/InventoryDataTable'
+import { IngredientDetailDrawer } from './components/IngredientDetailDrawer'
+import { Live86EngineView } from './components/Live86EngineView'
+import { AnalyticsCharts } from './components/AnalyticsCharts'
+import { InventoryForecast } from './components/InventoryForecast'
+import { SupplierManagement } from './components/SupplierManagement'
 
-const predictionColors: Record<string, string> = {
-  critical: 'border-red-400 bg-red-50',
-  below_threshold: 'border-orange-400 bg-orange-50',
-  warning: 'border-amber-300 bg-amber-50',
-  no_usage_data: 'border-gray-200 bg-gray-50',
-  ok: 'border-gray-200 bg-white',
-}
-
-const predictionLabels: Record<string, string> = {
-  critical: 'Critical - Running out soon',
-  below_threshold: 'Below Threshold',
-  warning: 'Warning - Will run out within a week',
-  no_usage_data: 'No usage data yet',
-  ok: 'Adequate stock',
-}
+type Tab = 'overview' | 'inventory' | 'analytics' | 'suppliers' | 'settings'
 
 export default function AdminInventoryPage() {
-  const [ingredients, setIngredients] = useState<Ingredient[]>([])
-  const [predictions, setPredictions] = useState<StockPrediction[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showPredictions, setShowPredictions] = useState(true)
-  const [adjustments, setAdjustments] = useState<Record<string, number>>({})
-  const [error, setError] = useState<string | null>(null)
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [drawerOpen, setDrawerOpen] = useState(false) // Triggered from table in real app
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true)
-        const [ingRes, predRes] = await Promise.all([
-          get<Ingredient[]>('/ingredients'),
-          get<StockPrediction[]>('/inventory/low-stock/predictions'),
-        ])
-        if (ingRes.success && ingRes.data) setIngredients(ingRes.data)
-        if (predRes.success && predRes.data) setPredictions(predRes.data)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
-
-  const criticalCount = predictions.filter((p) => p.status === 'critical' || p.status === 'below_threshold').length
-
-  const showSuccess = (msg: string) => {
-    setSuccessMsg(msg)
-    setTimeout(() => setSuccessMsg(null), 3000)
-  }
-
-  const handleAdjust = async (ingredientId: string) => {
-    const change = adjustments[ingredientId]
-    if (!change || change === 0) return
-    setError(null)
-    const res = await post('/inventory/adjust', {
-      ingredientId,
-      changeAmount: change,
-      reason: 'manual_restock',
-    })
-    if (res.success) {
-      setIngredients((prev) =>
-        prev.map((ing) =>
-          ing.id === ingredientId
-            ? { ...ing, current_stock: ing.current_stock + change }
-            : ing
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <InventoryOverviewHero />
+            <KPIGrid />
+            {/* We could place the Live86Engine view or Priority Alerts here too */}
+          </div>
         )
-      )
-      setAdjustments((prev) => ({ ...prev, [ingredientId]: 0 }))
-      showSuccess('Stock adjusted')
-      // Refresh predictions after stock change
-      const predRes = await get<StockPrediction[]>('/inventory/low-stock/predictions')
-      if (predRes.success && predRes.data) setPredictions(predRes.data)
-    } else {
-      setError(res.error || 'Failed to adjust stock')
+      case 'inventory':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+            <InventoryDataTable />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Placeholders for Expiry Tracking and Storage Locations */}
+              <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+                <h3 className="font-bold text-gray-900 mb-4">Expiry Tracking</h3>
+                <p className="text-sm text-gray-500">List of expiring items would go here...</p>
+              </div>
+              <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+                <h3 className="font-bold text-gray-900 mb-4">Storage Locations</h3>
+                <p className="text-sm text-gray-500">Map or list of storage locations...</p>
+              </div>
+            </div>
+          </div>
+        )
+      case 'analytics':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+            <InventoryForecast />
+            <AnalyticsCharts />
+          </div>
+        )
+      case 'suppliers':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <SupplierManagement />
+          </div>
+        )
+      case 'settings':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Live86EngineView />
+          </div>
+        )
+      default:
+        return null
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-pulse text-gray-400">Loading...</div>
-      </div>
-    )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Inventory Management
-        </h1>
-        <button
-          onClick={() => setShowPredictions(!showPredictions)}
-          className={`min-touch rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-            showPredictions
-              ? 'bg-gray-900 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          {showPredictions ? 'Hide Predictions' : 'Show Predictions'}
-        </button>
+    <div className="flex w-full min-h-[calc(100vh-3rem)] bg-[#F8FAFC]">
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        
+        {/* Sticky Header */}
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-6">
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Inventory</h1>
+            
+            {/* Global Search */}
+            <div className="hidden md:flex relative group">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-blue-500 transition-colors" />
+              <input 
+                type="text" 
+                placeholder="Search inventory, POs, suppliers..."
+                className="pl-9 pr-4 py-2 w-72 lg:w-96 bg-gray-100/50 border-transparent rounded-xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button className="relative p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+            </button>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center font-semibold text-sm shadow-sm cursor-pointer border border-white">
+              KA
+            </div>
+          </div>
+        </header>
+
+        {/* Tab Navigation */}
+        <div className="px-6 py-3 border-b border-gray-200/50 bg-white/50 backdrop-blur-md sticky top-[73px] z-20 flex overflow-x-auto hide-scrollbar">
+          <div className="flex space-x-1">
+            {[
+              { id: 'overview', label: 'Overview', icon: Package },
+              { id: 'inventory', label: 'Stock & Items', icon: Package },
+              { id: 'analytics', label: 'Analytics & Forecast', icon: BarChart2 },
+              { id: 'suppliers', label: 'Suppliers & POs', icon: Truck },
+              { id: 'settings', label: '86 Engine & Settings', icon: SettingsIcon }
+            ].map((tab) => {
+              const Icon = tab.icon
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as Tab)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                    isActive 
+                      ? 'bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10' 
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+          <div className="max-w-[1600px] mx-auto">
+            {renderTabContent()}
+          </div>
+        </div>
+
       </div>
 
-      {criticalCount > 0 && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 flex items-center gap-2">
-          <span className="text-red-600 font-bold text-lg">!</span>
-          <p className="text-sm text-red-700">
-            <span className="font-semibold">{criticalCount}</span> ingredient{criticalCount > 1 ? 's' : ''} need{criticalCount === 1 ? 's' : ''} immediate attention
-          </p>
-        </div>
-      )}
+      {/* AI Assistant Sidebar (Sticky Right) */}
+      <AIAssistantPanel />
 
-      {error && (
-        <div className="rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {/* Detail Drawer (Normally triggered by clicking a row in the DataTable, mocked to be togglable here if needed, or controlled by state) */}
+      {/* Set isOpen to true manually to see it, or pass setDrawerOpen to DataTable */}
+      <IngredientDetailDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      
+      {/* Floating button for demo purposes to open the drawer */}
+      <button 
+        onClick={() => setDrawerOpen(true)}
+        className="fixed bottom-6 right-[340px] px-4 py-2 bg-gray-900 text-white rounded-full shadow-xl shadow-gray-900/20 text-sm font-medium hover:scale-105 transition-transform z-30 flex items-center gap-2 border border-gray-700"
+      >
+        Demo: Open Ingredient Drawer
+      </button>
 
-      {successMsg && (
-        <div className="rounded-md bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-700">
-          {successMsg}
-        </div>
-      )}
-
-      {ingredients.length === 0 ? (
-        <p className="text-sm text-gray-400">No ingredients configured</p>
-      ) : (
-        <div className="space-y-2">
-          {ingredients.map((ingredient) => {
-            const isLow =
-              ingredient.current_stock <= ingredient.reorder_threshold
-            return (
-              <div
-                key={ingredient.id}
-                className={`rounded-lg border bg-white p-4 ${
-                  isLow ? 'border-alert/30 bg-red-50' : 'border-gray-200'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {ingredient.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {ingredient.current_stock} {ingredient.unit}
-                    </p>
-                  </div>
-                  {isLow && (
-                    <span className="inline-flex items-center rounded-full bg-alert/10 px-2 py-0.5 text-xs font-medium text-status-alert">
-                      Low Stock
-                    </span>
-                  )}
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all ${
-                      isLow ? 'bg-alert' : 'bg-ready'
-                    }`}
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        (ingredient.current_stock /
-                          (ingredient.reorder_threshold * 3)) *
-                          100
-                      )}%`,
-                    }}
-                  />
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <input
-                    type="number"
-                    value={adjustments[ingredient.id] || 0}
-                    onChange={(e) =>
-                      setAdjustments((prev) => ({
-                        ...prev,
-                        [ingredient.id]: Number(e.target.value),
-                      }))
-                    }
-                    className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                    placeholder="Amount"
-                  />
-                  <button
-                    onClick={() => handleAdjust(ingredient.id)}
-                    disabled={!adjustments[ingredient.id]}
-                    className="min-touch rounded-md bg-gray-900 text-white px-3 py-1 text-xs font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Adjust
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }
