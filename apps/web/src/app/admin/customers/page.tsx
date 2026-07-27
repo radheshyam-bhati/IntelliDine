@@ -1,239 +1,154 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { get } from '@/lib/api'
+import React, { useState } from 'react'
+import { Bell, Search, Users, Activity, BarChart2, Gift, Settings as SettingsIcon, ScanLine } from 'lucide-react'
 
-interface CustomerRecord {
-  id: string
-  name: string
-  phone: string | null
-  type: 'registered'
-  total_orders: number
-  total_spent: number
-  last_visit: string | null
-  first_visit: string | null
-  is_repeat: boolean
-  recent_orders: { id: string; status: string; date: string }[]
-}
+// Import components
+import { AIAssistantPanel } from './components/AIAssistantPanel'
+import { CustomerOverviewHero } from './components/CustomerOverviewHero'
+import { CustomerKPIGrid } from './components/CustomerKPIGrid'
+import { CustomerDataTable } from './components/CustomerDataTable'
+import { CustomerProfileDrawer } from './components/CustomerProfileDrawer'
+import { CustomerAnalytics } from './components/CustomerAnalytics'
+import { LoyaltyAndReviews } from './components/LoyaltyAndReviews'
 
-interface CustomersResponse {
-  customers: CustomerRecord[]
-  total: number
-  total_revenue: number
-  avg_orders_per_customer: number
-  repeat_customers: number
-}
+type Tab = 'overview' | 'directory' | 'analytics' | 'loyalty' | 'settings'
 
 export default function AdminCustomersPage() {
-  const [data, setData] = useState<CustomersResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null)
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
 
-  // Debounce search input to avoid excessive API calls
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current)
-    debounceTimer.current = setTimeout(() => {
-      setDebouncedSearch(search)
-    }, 300)
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current)
+  const handleRowClick = (id: string) => {
+    setSelectedCustomerId(id)
+    setDrawerOpen(true)
+  }
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <CustomerOverviewHero />
+            <CustomerKPIGrid />
+          </div>
+        )
+      case 'directory':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <CustomerDataTable onRowClick={handleRowClick} />
+          </div>
+        )
+      case 'analytics':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <CustomerAnalytics />
+          </div>
+        )
+      case 'loyalty':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <LoyaltyAndReviews />
+          </div>
+        )
+      case 'settings':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex items-center justify-center h-96 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50">
+            <p className="text-gray-500 font-medium">Settings & Communication Center under construction.</p>
+          </div>
+        )
+      default:
+        return null
     }
-  }, [search])
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true)
-        const params = debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ''
-        const res = await get<CustomersResponse>(`/admin/customers${params}`)
-        if (res.success && res.data) setData(res.data)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [debouncedSearch])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-pulse text-gray-400">Loading customer data...</div>
-      </div>
-    )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Customer Records</h1>
-      </div>
-
-      {data && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Total Customers</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">{data.total}</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Total Revenue</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">
-              ${data.total_revenue.toFixed(2)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Repeat Customers</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">
-              {data.repeat_customers}
-              <span className="text-sm font-normal text-gray-500 ml-1">
-                / {data.total} ({data.total > 0 ? Math.round((data.repeat_customers / data.total) * 100) : 0}%)
-              </span>
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="relative">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search customers by name or phone..."
-          className="block w-full rounded-md border border-gray-300 px-3 py-2 pl-10 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-hidden"
-        />
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-          &#128269;
-        </span>
-      </div>
-
-      {!data || data.customers.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500">
-            {search ? 'No customers match your search' : 'No customer data yet'}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {search ? 'Try a different search term' : 'Customers will appear once orders are placed'}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {data.customers.map((customer) => (
-            <div
-              key={customer.id}
-              className="rounded-lg border border-gray-200 bg-white overflow-hidden"
-            >
-              <button
-                onClick={() =>
-                  setExpandedCustomer(
-                    expandedCustomer === customer.id ? null : customer.id
-                  )
-                }
-                className="w-full text-left p-4 hover:bg-gray-50 transition-colors focus:outline-hidden"
-                aria-expanded={expandedCustomer === customer.id}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-semibold text-sm">
-                      {customer.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                          {customer.name}
-                        </p>
-                        {customer.is_repeat && (
-                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                            Repeat
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {customer.phone || 'No phone'} &middot;{' '}
-                        {customer.total_orders} order{customer.total_orders !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0 ml-4">
-                    <p className="text-sm font-bold text-gray-900">
-                      ${customer.total_spent.toFixed(2)}
-                    </p>
-                    {customer.last_visit && (
-                      <p className="text-[10px] text-gray-400">
-                        Last:{' '}
-                        {new Date(customer.last_visit).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </button>
-
-              {expandedCustomer === customer.id && (
-                <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
-                  <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-                    Recent Orders
-                  </h4>
-                  {customer.recent_orders.length === 0 ? (
-                    <p className="text-xs text-gray-400">No orders yet</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {customer.recent_orders.map((order) => (
-                        <div
-                          key={order.id}
-                          className="flex items-center justify-between text-xs text-gray-600"
-                        >
-                          <span className="font-mono text-gray-400">
-                            #{order.id.slice(0, 8)}
-                          </span>
-                          <span
-                            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                              order.status === 'completed'
-                                ? 'bg-green-100 text-green-700'
-                                : order.status === 'cancelled'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-amber-100 text-amber-700'
-                            }`}
-                          >
-                            {order.status}
-                          </span>
-                          <span className="text-gray-400">
-                            {new Date(order.date).toLocaleDateString()}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {customer.first_visit && customer.last_visit && (
-                    <div className="mt-3 pt-2 border-t border-gray-200 flex justify-between text-[10px] text-gray-400">
-                      <span>First visit: {new Date(customer.first_visit).toLocaleDateString()}</span>
-                      <span>
-                        {Math.max(
-                          1,
-                          Math.ceil(
-                            (new Date(customer.last_visit).getTime() -
-                              new Date(customer.first_visit).getTime()) /
-                              (1000 * 60 * 60 * 24)
-                          )
-                        )}{' '}
-                        day span
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
+    <div className="flex w-full min-h-[calc(100vh-3rem)] bg-[#F8FAFC]">
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        
+        {/* Sticky Header */}
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-6">
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Customers</h1>
+            
+            {/* Global Search */}
+            <div className="hidden md:flex relative group">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-blue-500 transition-colors" />
+              <input 
+                type="text" 
+                placeholder="Search customers, phones, emails..."
+                className="pl-9 pr-4 py-2 w-72 lg:w-96 bg-gray-100/50 border-transparent rounded-xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none"
+              />
             </div>
-          ))}
-        </div>
-      )}
+          </div>
 
-      {data && data.customers.length > 0 && (
-        <div className="text-center text-xs text-gray-400">
-          Showing {data.customers.length} customer{data.customers.length !== 1 ? 's' : ''}
-          {search ? ` matching "${search}"` : ''}
+          <div className="flex items-center gap-4">
+            <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+              <ScanLine className="w-4 h-4" /> Scan QR
+            </button>
+            <button className="relative p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+            </button>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center font-semibold text-sm shadow-sm cursor-pointer border border-white">
+              KA
+            </div>
+          </div>
+        </header>
+
+        {/* Tab Navigation */}
+        <div className="px-6 py-3 border-b border-gray-200/50 bg-white/50 backdrop-blur-md sticky top-[73px] z-20 flex overflow-x-auto hide-scrollbar">
+          <div className="flex space-x-1">
+            {[
+              { id: 'overview', label: 'Overview', icon: Activity },
+              { id: 'directory', label: 'Customer Directory', icon: Users },
+              { id: 'analytics', label: 'Analytics & Trends', icon: BarChart2 },
+              { id: 'loyalty', label: 'Loyalty & Feedback', icon: Gift },
+              { id: 'settings', label: 'Settings & Comms', icon: SettingsIcon }
+            ].map((tab) => {
+              const Icon = tab.icon
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as Tab)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                    isActive 
+                      ? 'bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10' 
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
-      )}
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+          <div className="max-w-[1600px] mx-auto">
+            {renderTabContent()}
+          </div>
+        </div>
+
+      </div>
+
+      {/* AI Assistant Sidebar (Sticky Right) */}
+      <AIAssistantPanel />
+
+      {/* Profile Drawer */}
+      <CustomerProfileDrawer 
+        isOpen={drawerOpen} 
+        onClose={() => {
+          setDrawerOpen(false)
+          setSelectedCustomerId(null)
+        }} 
+      />
+
     </div>
   )
 }
