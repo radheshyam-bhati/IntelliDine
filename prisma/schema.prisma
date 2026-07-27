@@ -1,0 +1,304 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["intellidine"]
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String  @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+  @@schema("intellidine")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String   @db.Uuid
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+  @@schema("intellidine")
+}
+
+model User {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  fullName      String? @map("full_name")
+  name          String?
+  passwordHash  String?   @map("password_hash")
+  role          String    @default("customer")
+  restaurantId  String?   @db.Uuid @map("restaurant_id")
+  phone         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+//   updatedAt     DateTime  @updatedAt
+
+  restaurant             Restaurant?            @relation(fields: [restaurantId], references: [id])
+  accounts               Account[]
+  sessions               Session[]
+  ordersAsCustomer       Order[]                @relation("OrderCustomer")
+  ordersAsCreator        Order[]                @relation("OrderCreator")
+  inventoryAdjustments   InventoryAdjustment[]
+
+  @@map("users")
+  @@schema("intellidine")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+  @@schema("intellidine")
+}
+
+model Restaurant {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String
+  slug              String   @unique
+  currency          String   @default("USD")
+  taxRate           Decimal  @default(0) @map("tax_rate")
+  serviceChargeRate Decimal  @default(0) @map("service_charge_rate")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  users               User[]
+  menuCategories      MenuCategory[]
+  menuItems           MenuItem[]
+  ingredients         Ingredient[]
+  tables              Table[]
+  orders              Order[]
+  bills               Bill[]
+  reservations        Reservation[]
+  queueEntries        QueueEntry[]
+  forecasts           Forecast[]
+
+  @@map("restaurants")
+  @@schema("intellidine")
+}
+
+model MenuCategory {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String   @db.Uuid @map("restaurant_id")
+  name         String
+  displayOrder Int      @default(0) @map("display_order")
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItems    MenuItem[]
+
+  @@map("menu_categories")
+  @@schema("intellidine")
+}
+
+model MenuItem {
+  id                 String   @id @default(uuid()) @db.Uuid
+  restaurantId       String   @db.Uuid @map("restaurant_id")
+  categoryId         String   @db.Uuid @map("category_id")
+  name               String
+  description        String   @default("")
+  price              Decimal
+  imageUrl           String? @map("image_url")
+  dietaryTags        String[] @default([]) @map("dietary_tags")
+  isAvailable        Boolean  @default(true) @map("is_available")
+  isManualOverride   Boolean  @default(false) @map("is_manual_override")
+  availabilityWindow Json? @map("availability_window")
+
+  restaurant         Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category           MenuCategory         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  ingredients        MenuItemIngredient[]
+  orderItems         OrderItem[]
+  forecasts          Forecast[]
+
+  @@map("menu_items")
+  @@schema("intellidine")
+}
+
+model Ingredient {
+  id               String   @id @default(uuid()) @db.Uuid
+  restaurantId     String   @db.Uuid @map("restaurant_id")
+  name             String
+  unit             String
+  currentStock     Decimal  @default(0) @map("current_stock")
+  reorderThreshold Decimal  @default(0) @map("reorder_threshold")
+  supplierName     String? @map("supplier_name")
+
+  restaurant           Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItemIngredients  MenuItemIngredient[]
+  inventoryAdjustments InventoryAdjustment[]
+
+  @@map("ingredients")
+  @@schema("intellidine")
+}
+
+model MenuItemIngredient {
+  id               String   @id @default(uuid()) @db.Uuid
+  menuItemId       String   @db.Uuid @map("menu_item_id")
+  ingredientId     String   @db.Uuid @map("ingredient_id")
+  quantityRequired Decimal @map("quantity_required")
+
+  menuItem         MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  ingredient       Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, ingredientId])
+  @@map("menu_item_ingredients")
+  @@schema("intellidine")
+}
+
+model Table {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String   @db.Uuid @map("restaurant_id")
+  label        String
+  capacity     Int      @default(4)
+  status       String   @default("empty")
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders       Order[]
+  bills        Bill[]
+  reservations Reservation[]
+
+  @@map("tables")
+  @@schema("intellidine")
+}
+
+model Order {
+  id               String   @id @default(uuid()) @db.Uuid
+  restaurantId     String   @db.Uuid @map("restaurant_id")
+  tableId          String   @db.Uuid @map("table_id")
+  customerId       String? @db.Uuid @map("customer_id")
+  createdByUserId  String? @db.Uuid @map("created_by_user_id")
+  status           String   @default("placed")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt
+
+  restaurant          Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table               Table                 @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  customer            User?                 @relation("OrderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  createdByUser       User?                 @relation("OrderCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  orderItems          OrderItem[]
+  inventoryAdjustments InventoryAdjustment[]
+
+  @@map("orders")
+  @@schema("intellidine")
+}
+
+model OrderItem {
+  id               String   @id @default(uuid()) @db.Uuid
+  orderId          String   @db.Uuid @map("order_id")
+  menuItemId       String   @db.Uuid @map("menu_item_id")
+  quantity         Int      @default(1)
+  specialRequest   String? @map("special_request")
+  unitPriceAtOrder Decimal @map("unit_price_at_order")
+
+  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem         MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+  @@schema("intellidine")
+}
+
+model Bill {
+  id                  String   @id @default(uuid()) @db.Uuid
+  restaurantId        String   @db.Uuid @map("restaurant_id")
+  tableId             String   @db.Uuid @map("table_id")
+  orderIds            String[] @db.Uuid @map("order_ids")
+  subtotal            Decimal  @default(0)
+  taxAmount           Decimal  @default(0) @map("tax_amount")
+  serviceChargeAmount Decimal  @default(0) @map("service_charge_amount")
+  total               Decimal  @default(0)
+  paymentStatus       String   @default("unpaid") @map("payment_status")
+  paymentReference    String? @map("payment_reference")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  restaurant          Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table               Table      @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@map("bills")
+  @@schema("intellidine")
+}
+
+model Reservation {
+  id            String   @id @default(uuid()) @db.Uuid
+  restaurantId  String   @db.Uuid @map("restaurant_id")
+  customerName  String @map("customer_name")
+  customerPhone String? @map("customer_phone")
+  partySize     Int @map("party_size")
+  reservedFor   DateTime @map("reserved_for")
+  tableId       String?  @db.Uuid @map("table_id")
+  status        String   @default("confirmed")
+
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table         Table?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  @@map("reservations")
+  @@schema("intellidine")
+}
+
+model QueueEntry {
+  id            String   @id @default(uuid()) @db.Uuid
+  restaurantId  String   @db.Uuid @map("restaurant_id")
+  customerName  String @map("customer_name")
+  customerPhone String? @map("customer_phone")
+  partySize     Int @map("party_size")
+  joinedAt      DateTime @default(now()) @map("joined_at")
+  status        String   @default("waiting")
+
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("queue_entries")
+  @@schema("intellidine")
+}
+
+model InventoryAdjustment {
+  id              String   @id @default(uuid()) @db.Uuid
+  ingredientId    String   @db.Uuid @map("ingredient_id")
+  changeAmount    Decimal @map("change_amount")
+  reason          String
+  createdByUserId String? @db.Uuid @map("created_by_user_id")
+  orderId         String?  @db.Uuid @map("order_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  ingredient      Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  createdByUser   User?      @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  order           Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@map("inventory_adjustments")
+  @@schema("intellidine")
+}
+
+model Forecast {
+  id                String   @id @default(uuid()) @db.Uuid
+  restaurantId      String   @db.Uuid @map("restaurant_id")
+  menuItemId        String   @db.Uuid @map("menu_item_id")
+  forecastDate      DateTime @db.Date @map("forecast_date")
+  predictedQuantity Decimal @map("predicted_quantity")
+  basis             String
+  generatedAt       DateTime @default(now()) @map("generated_at")
+
+  restaurant        Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItem          MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, menuItemId, forecastDate])
+  @@map("forecasts")
+  @@schema("intellidine")
+}

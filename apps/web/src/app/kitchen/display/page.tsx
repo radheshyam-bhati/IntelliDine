@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Order, OrderItem, OrderStatus, Ingredient } from '@kitchensync/shared'
 import { get, patch, post } from '@/lib/api'
 import { connect } from '@/lib/socket'
-import { supabase } from '@/lib/supabase-client'
+
 import StatusBadge from '@/components/StatusBadge'
 
 type OrderWithDetails = Order & {
@@ -56,10 +56,7 @@ export default function KitchenDisplayPage() {
 
       if (controller.signal.aborted) return
 
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData.session?.access_token || ''
-
-      socket = connect('', token)
+      socket = connect('', '')
 
       socket.on('order:created', (order) => {
         setOrders((prev) => [...prev, order])

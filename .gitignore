@@ -38,3 +38,5 @@ next-env.d.ts
 
 # exclude docs folder from git as requested
 docs/
+
+/generated/prisma

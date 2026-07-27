@@ -1,10 +1,11 @@
-import dotenv from 'dotenv'
-dotenv.config()
+import './env.js'
 
 import express from 'express'
 import cors from 'cors'
 import { createServer } from 'http'
 import { Server as SocketServer } from 'socket.io'
+import { createAdapter } from '@socket.io/redis-adapter'
+import { Redis } from 'ioredis'
 
 import { registerSocketHandlers } from './socket/index.js'
 import menuRoutes from './routes/menu.js'
@@ -30,6 +31,13 @@ const io = new SocketServer(httpServer, {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   },
 })
+
+if (process.env.REDIS_URL) {
+  const pubClient = new Redis(process.env.REDIS_URL)
+  const subClient = pubClient.duplicate()
+  io.adapter(createAdapter(pubClient, subClient))
+  console.log(`[API] Socket.IO Redis Adapter configured`)
+}
 
 app.set('io', io)
 

@@ -100,11 +100,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-gray-400">
-          <Link href="/menu" className="underline hover:text-gray-600">
-            View customer menu
-          </Link>
-        </p>
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import { supabaseAdmin } from '../lib/supabase-admin.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
-import { createOrderSchema, updateOrderStatusSchema, modifyOrderItemsSchema, updateSpecialRequestSchema } from '../lib/validation.js'
+import { createOrderSchema, updateOrderStatusSchema, updateOrderPrioritySchema, modifyOrderItemsSchema, updateSpecialRequestSchema } from '../lib/validation.js'
 import { ValidationError, NotFoundError } from '../lib/errors.js'
 import { processOrderDeduction } from '../services/cascade.js'
 import { z } from 'zod'
@@ -46,6 +46,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
         customer_id: body.customer_id ?? req.user?.id ?? null,
         created_by_user_id: req.user?.id ?? null,
         status: 'placed',
+        priority: body.priority,
       })
       .select()
       .single()
@@ -142,6 +143,44 @@ router.get('/detail/:id', authenticate, async (req: Request, res: Response, next
 
     res.json({ success: true, data: order })
   } catch (err) {
+    next(err)
+  }
+})
+
+router.put('/:id/priority', authenticate, requireRole('kitchen', 'server', 'manager'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params
+    const body = updateOrderPrioritySchema.parse(req.body)
+
+    const { data: order, error: fetchError } = await supabaseAdmin
+      .from('orders')
+      .select('restaurant_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !order) {
+      throw new NotFoundError('Order not found')
+    }
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('orders')
+      .update({ priority: body.priority, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(`restaurant:${order.restaurant_id}:kitchen`).emit('order:updated', updated)
+    }
+
+    res.json({ success: true, data: updated })
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return next(new ValidationError('Validation failed', err.errors))
+    }
     next(err)
   }
 })

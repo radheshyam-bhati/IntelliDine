@@ -1,24 +1,19 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { createServerSupabase } from '@/lib/supabase-server'
+import { auth } from '@/auth'
 
 export default async function StaffLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = createServerSupabase()
-  const { data: authData } = await supabase.auth.getUser()
-  if (!authData?.user) redirect('/staff/login')
+  const session = await auth()
+  if (!session?.user) redirect('/login')
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', authData.user.id)
-    .single()
+  const role = (session.user as any).role
 
-  if (!userData || !['server', 'manager'].includes(userData.role)) {
-    redirect('/staff/login')
+  if (!role || !['server', 'manager'].includes(role)) {
+    redirect('/')
   }
 
   return (
@@ -35,7 +30,7 @@ export default async function StaffLayout({
             >
               Orders
             </Link>
-            {userData.role === 'manager' && (
+            {role === 'manager' && (
               <Link
                 href="/admin/dashboard"
                 className="hover:text-gray-300 transition-colors"

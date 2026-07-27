@@ -4,6 +4,11 @@ import { authenticate, requireRole } from '../middleware/auth.js'
 import { updatePaymentStatusSchema } from '../lib/validation.js'
 import { NotFoundError, ValidationError } from '../lib/errors.js'
 import { z } from 'zod'
+import Stripe from 'stripe'
+
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  : null
 
 const router = Router()
 
@@ -178,6 +183,47 @@ router.put('/:billId/payment', authenticate, requireRole('server', 'manager'), a
   }
 })
 
+router.post('/:billId/stripe-intent', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { billId } = req.params
+
+    const { data: bill, error: fetchError } = await supabaseAdmin
+      .from('bills')
+      .select('*, restaurants(name)')
+      .eq('id', billId)
+      .single()
+
+    if (fetchError || !bill) {
+      throw new NotFoundError('Bill not found')
+    }
+
+    if (bill.payment_status === 'paid') {
+      throw new ValidationError('Bill is already paid')
+    }
+
+    const amountInCents = Math.round(bill.total * 100)
+
+    if (stripe) {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: 'usd',
+        metadata: { bill_id: bill.id, restaurant_id: bill.restaurant_id },
+      })
+      res.json({ success: true, data: { client_secret: paymentIntent.client_secret, amount: amountInCents } })
+    } else {
+      res.json({
+        success: true,
+        data: {
+          client_secret: 'pi_mock_secret_for_local_dev',
+          amount: amountInCents,
+          mock: true
+        }
+      })
+    }
+  } catch (err) {
+    next(err)
+  }
+})
 
 const splitEvenlySchema = z.object({
   num_splits: z.number().int().positive('Number of splits must be positive').min(2, 'At least 2 splits required'),

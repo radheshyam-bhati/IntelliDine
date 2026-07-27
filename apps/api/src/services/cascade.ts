@@ -3,7 +3,7 @@ import { Server as SocketServer } from 'socket.io'
 
 export async function recalculateAvailability(
   ingredientId: string,
-  supabase: SupabaseClient,
+  supabase: any,
   io: SocketServer | null,
 ): Promise<void> {
   const { data: ingredient, error: ingError } = await supabase
@@ -32,7 +32,7 @@ export async function recalculateAvailability(
 
   if (!links || links.length === 0) return
 
-  const menuItemIds = links.map((l) => l.menu_item_id)
+  const menuItemIds = links.map((l: any) => l.menu_item_id)
 
   const { data: items, error: itemError } = await supabase
     .from('menu_items')
@@ -69,7 +69,7 @@ export async function recalculateAvailability(
 
 export async function processOrderDeduction(
   orderId: string,
-  supabase: SupabaseClient,
+  supabase: any,
   io: SocketServer | null,
 ): Promise<void> {
   const { data: orderItems, error: itemsError } = await supabase
@@ -82,7 +82,7 @@ export async function processOrderDeduction(
     return
   }
 
-  const menuItemIds = orderItems.map((oi) => oi.menu_item_id)
+  const menuItemIds = orderItems.map((oi: any) => oi.menu_item_id)
 
   const { data: links, error: linkError } = await supabase
     .from('menu_item_ingredients')
@@ -97,7 +97,7 @@ export async function processOrderDeduction(
   if (!links || links.length === 0) return
 
   for (const orderItem of orderItems) {
-    const matchingLinks = links.filter((l) => l.menu_item_id === orderItem.menu_item_id)
+    const matchingLinks = links.filter((l: any) => l.menu_item_id === orderItem.menu_item_id)
 
     for (const link of matchingLinks) {
       const deductionAmount = link.quantity_required * orderItem.quantity

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { Table, Order, OrderItem, OrderStatus } from '@kitchensync/shared'
 import { get, patch } from '@/lib/api'
 import { connect } from '@/lib/socket'
-import { supabase } from '@/lib/supabase-client'
+
 import TableCard from '@/components/TableCard'
 import OrderCard from '@/components/OrderCard'
 
@@ -30,13 +30,11 @@ export default function StaffOrdersPage() {
     })
 
     async function init() {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData.session?.access_token || ''
       const restaurantId = ''
 
       if (controller.signal.aborted) return
 
-      socket = connect(restaurantId, token)
+      socket = connect(restaurantId, '')
 
       socket.on('order:created', (order) => {
         setOrders((prev) => [...prev, order])

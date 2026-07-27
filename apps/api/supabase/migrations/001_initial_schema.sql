@@ -1,3 +1,4 @@
+SET search_path TO intellidine;
 -- KitchenSync Database Schema
 -- PostgreSQL via Supabase
 
@@ -24,7 +25,7 @@ CREATE TABLE restaurants (
 );
 
 CREATE TABLE users (
-  id uuid PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id uuid REFERENCES restaurants(id) ON DELETE SET NULL,
   role user_role NOT NULL DEFAULT 'customer',
   full_name text NOT NULL,

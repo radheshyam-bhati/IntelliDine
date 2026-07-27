@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express'
 import { supabaseAdmin } from '../lib/supabase-admin.js'
 import { AuthError, ForbiddenError } from '../lib/errors.js'
 import type { UserRole } from '@kitchensync/shared'
+import { decode } from '@auth/core/jwt'
+import cookie from 'cookie'
 
 declare global {
   namespace Express {
@@ -18,22 +20,38 @@ declare global {
 }
 
 export async function authenticate(req: Request, _res: Response, next: NextFunction): Promise<void> {
-  const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next(new AuthError('Missing or invalid Authorization header'))
+  let token = req.headers.authorization?.startsWith('Bearer ')
+    ? req.headers.authorization.slice(7)
+    : undefined
+
+  if (!token && req.headers.cookie) {
+    const cookies = cookie.parse(req.headers.cookie)
+    token = cookies['authjs.session-token'] || cookies['__Secure-authjs.session-token']
   }
 
-  const token = authHeader.slice(7)
+  if (!token) {
+    return next(new AuthError('Authentication required'))
+  }
 
-  const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token)
-  if (error || !authUser) {
+  let decodedToken
+  try {
+    decodedToken = await decode({
+      token,
+      secret: process.env.AUTH_SECRET as string,
+      salt: process.env.NODE_ENV === 'production' ? "__Secure-authjs.session-token" : "authjs.session-token"
+    })
+  } catch (e) {
+    return next(new AuthError('Invalid or expired token'))
+  }
+
+  if (!decodedToken || !decodedToken.id) {
     return next(new AuthError('Invalid or expired token'))
   }
 
   const { data: profile } = await supabaseAdmin
     .from('users')
     .select('id, restaurant_id, role, full_name, phone')
-    .eq('id', authUser.id)
+    .eq('id', decodedToken.id)
     .single()
 
   if (!profile) {

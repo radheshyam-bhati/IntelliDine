@@ -13,6 +13,13 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "prisma": "^7.9.0",
     "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.9.0",
+    "caniuse-lite": "^1.0.30001806",
+    "engine.io-parser": "^5.2.3",
+    "safer-buffer": "^2.1.2"
   }
 }

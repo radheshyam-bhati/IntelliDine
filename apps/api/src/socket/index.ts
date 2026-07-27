@@ -1,10 +1,19 @@
 import { Server as SocketServer, Socket } from 'socket.io'
 import { supabaseAdmin } from '../lib/supabase-admin.js'
 import type { UserRole } from '@kitchensync/shared'
+import { decode } from '@auth/core/jwt'
+import cookie from 'cookie'
 
 export function registerSocketHandlers(io: SocketServer): void {
   io.use(async (socket, next) => {
-    const token = socket.handshake.auth?.token || socket.handshake.query?.token
+    let token = socket.handshake.auth?.token || socket.handshake.query?.token
+
+    // Attempt to extract NextAuth session token from cookies
+    const cookieHeader = socket.request.headers.cookie
+    if (cookieHeader) {
+      const cookies = cookie.parse(cookieHeader)
+      token = cookies['authjs.session-token'] || cookies['__Secure-authjs.session-token'] || token
+    }
 
     if (!token || typeof token !== 'string') {
       const restaurantSlug = socket.handshake.auth?.restaurantSlug || socket.handshake.query?.restaurantSlug
@@ -29,15 +38,26 @@ export function registerSocketHandlers(io: SocketServer): void {
       return next(new Error('Authentication required'))
     }
 
-    const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token)
-    if (error || !authUser) {
+    let decodedToken
+    try {
+      decodedToken = await decode({
+        token,
+        secret: process.env.AUTH_SECRET as string,
+        salt: process.env.NODE_ENV === 'production' ? "__Secure-authjs.session-token" : "authjs.session-token"
+      })
+    } catch (e) {
+      console.error('JWT Decode Error:', e)
+      return next(new Error('Invalid or expired token'))
+    }
+
+    if (!decodedToken || !decodedToken.id) {
       return next(new Error('Invalid or expired token'))
     }
 
     const { data: profile } = await supabaseAdmin
       .from('users')
-      .select('id, restaurant_id, role, full_name, phone')
-      .eq('id', authUser.id)
+      .select('id, restaurant_id, role, name, phone')
+      .eq('id', decodedToken.id)
       .single()
 
     if (!profile) {
@@ -48,7 +68,7 @@ export function registerSocketHandlers(io: SocketServer): void {
       id: profile.id,
       restaurant_id: profile.restaurant_id,
       role: profile.role as UserRole,
-      full_name: profile.full_name,
+      full_name: profile.name,
       phone: profile.phone,
     }
 

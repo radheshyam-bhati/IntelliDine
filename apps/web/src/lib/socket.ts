@@ -19,6 +19,7 @@ export function connect(restaurantId: string, token: string, restaurantSlug?: st
 
   socket = io(url, {
     auth,
+    withCredentials: true,
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: 10,

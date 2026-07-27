@@ -4,6 +4,7 @@ export const createOrderSchema = z.object({
   restaurant_id: z.string().uuid('Restaurant ID must be a valid UUID'),
   table_id: z.string().uuid('Table ID must be a valid UUID'),
   customer_id: z.string().uuid().nullable().optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional().default('medium'),
   items: z.array(z.object({
     menu_item_id: z.string().uuid('Menu item ID must be a valid UUID'),
     quantity: z.number().int().positive('Quantity must be a positive integer'),
@@ -14,6 +15,12 @@ export const createOrderSchema = z.object({
 export const updateOrderStatusSchema = z.object({
   status: z.enum(['placed', 'received', 'cooking', 'ready', 'served', 'completed', 'cancelled'], {
     errorMap: () => ({ message: 'Invalid order status' }),
+  }),
+})
+
+export const updateOrderPrioritySchema = z.object({
+  priority: z.enum(['low', 'medium', 'high'], {
+    errorMap: () => ({ message: 'Invalid order priority' }),
   }),
 })
 

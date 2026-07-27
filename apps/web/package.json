@@ -8,10 +8,16 @@
     "start": "next start"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.11.3",
     "@kitchensync/shared": "*",
+    "@prisma/adapter-pg": "^7.9.0",
     "@supabase/ssr": "^0.5.0",
     "@supabase/supabase-js": "^2.45.0",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "next": "^14.2.0",
+    "next-auth": "^5.0.0-beta.32",
+    "pg": "^8.22.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "socket.io-client": "^4.7.5",
@@ -19,7 +25,10 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
+    "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.14.0",
+    "@types/pg": "^8.20.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.7",
     "autoprefixer": "^10.4.19",

@@ -4,8 +4,10 @@ import { authenticate, requireRole } from '../middleware/auth.js'
 import { createMenuItemSchema, updateMenuItemSchema } from '../lib/validation.js'
 import { ValidationError, NotFoundError } from '../lib/errors.js'
 import { z } from 'zod'
+import multer from 'multer'
 
 const router = Router()
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
 
 const createCategorySchema = z.object({
   restaurant_id: z.string().uuid('Restaurant ID must be a valid UUID'),
@@ -86,6 +88,37 @@ router.get('/:restaurantId', async (req: Request, res: Response, next: NextFunct
     if (itemError) throw itemError
 
     res.json({ success: true, data: { categories, items } })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/:restaurantId/upload-image', authenticate, requireRole('manager'), upload.single('image') as any, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { restaurantId } = req.params
+    const file = req.file
+
+    if (!file) {
+      throw new ValidationError('No image file provided')
+    }
+
+    const fileExt = file.originalname.split('.').pop()
+    const fileName = `${restaurantId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+
+    const { error } = await supabaseAdmin.storage
+      .from('menu-images')
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      })
+
+    if (error) throw error
+
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from('menu-images')
+      .getPublicUrl(fileName)
+
+    res.json({ success: true, data: { image_url: publicUrl } })
   } catch (err) {
     next(err)
   }

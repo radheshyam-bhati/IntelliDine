@@ -1,25 +1,18 @@
 import type { ApiResponse } from '@kitchensync/shared'
-import { supabase } from './supabase-client'
+
 
 const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'
-
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  return headers
-}
 
 async function request<T>(
   method: string,
   path: string,
   body?: unknown
 ): Promise<ApiResponse<T>> {
-  const headers = await getAuthHeaders()
-  const options: RequestInit = { method, headers }
+  const options: RequestInit = { 
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include'
+  }
 
   if (body !== undefined) {
     options.body = JSON.stringify(body)
