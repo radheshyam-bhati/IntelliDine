@@ -20,6 +20,12 @@ import adminRoutes from './routes/admin.js'
 import userRoutes from './routes/users.js'
 import forecastRoutes from './routes/forecasts.js'
 import webRoutes from './routes/web.js'
+import supplierRoutes from './routes/suppliers.js'
+import purchaseOrderRoutes from './routes/purchase-orders.js'
+import crmRoutes from './routes/crm.js'
+import campaignRoutes from './routes/campaigns.js'
+import subscriptionRoutes from './routes/subscriptions.js'
+import shiftRoutes from './routes/shifts.js'
 import { AppError } from './lib/errors.js'
 
 const app = express()
@@ -55,6 +61,12 @@ app.use('/api/ai', aiRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/forecasts', forecastRoutes)
+app.use('/api/suppliers', supplierRoutes)
+app.use('/api/purchase-orders', purchaseOrderRoutes)
+app.use('/api', crmRoutes)
+app.use('/api', campaignRoutes) // campaigns + coupons
+app.use('/api/subscriptions', subscriptionRoutes)
+app.use('/api/shifts', shiftRoutes)
 app.use('/api', webRoutes)
 
 app.get('/api/health', (_req, res) => {

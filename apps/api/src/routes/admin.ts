@@ -92,7 +92,7 @@ router.get('/dashboard', authenticate, requireRole('manager'), async (req: Reque
       }
     }
 
-    if (tablesTotal > 0 && completedOrders.length > 0) {
+    if (tablesTotal > 0 && completedOrders && completedOrders.length > 0) {
       tableTurnover = Math.round((completedOrders.length / tablesTotal) * 10) / 10
     }
 

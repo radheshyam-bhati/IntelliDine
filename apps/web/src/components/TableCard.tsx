@@ -6,6 +6,7 @@ const statusColors: Record<TableStatus, string> = {
   ordered: 'border-amber-400 bg-amber-50 text-amber-800',
   needs_bill: 'border-orange-400 bg-orange-50 text-orange-800',
   needs_cleaning: 'border-red-400 bg-red-50 text-red-800',
+  reserved: 'border-purple-400 bg-purple-50 text-purple-800',
 }
 
 const statusLabels: Record<TableStatus, string> = {
@@ -14,6 +15,7 @@ const statusLabels: Record<TableStatus, string> = {
   ordered: 'Ordered',
   needs_bill: 'Needs Bill',
   needs_cleaning: 'Needs Cleaning',
+  reserved: 'Reserved',
 }
 
 interface TableCardProps {

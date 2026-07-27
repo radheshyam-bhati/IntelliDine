@@ -14,7 +14,7 @@ export interface RestaurantContext {
 }
 
 export async function gatherRestaurantContext(
-  supabase: SupabaseClient,
+  supabase: any,
   restaurantId: string,
 ): Promise<RestaurantContext> {
   const now = new Date()
@@ -48,15 +48,15 @@ export async function gatherRestaurantContext(
 
   let todayRevenue = 0
   if (todayOrders && todayOrders.length > 0) {
-    const todayIds = todayOrders.map((o) => o.id)
+    const todayIds = todayOrders.map((o: any) => o.id)
     const { data: todayItems } = await supabase
       .from('order_items')
       .select('unit_price_at_order, quantity')
       .in('order_id', todayIds)
-    todayRevenue = todayItems?.reduce((s, i) => s + i.unit_price_at_order * i.quantity, 0) || 0
+    todayRevenue = todayItems?.reduce((s: any, i: any) => s + i.unit_price_at_order * i.quantity, 0) || 0
   }
 
-  const weekIds = weekOrders?.map((o) => o.id) || []
+  const weekIds = weekOrders?.map((o: any) => o.id) || []
   let topSellers: { name: string; quantity: number }[] = []
   let bottomSellers: { name: string; quantity: number }[] = []
 
@@ -68,14 +68,14 @@ export async function gatherRestaurantContext(
 
     if (weekItems && weekItems.length > 0) {
       const qtyMap = new Map<string, number>()
-      weekItems.forEach((i) => qtyMap.set(i.menu_item_id, (qtyMap.get(i.menu_item_id) || 0) + i.quantity))
+      weekItems.forEach((i: any) => qtyMap.set(i.menu_item_id, (qtyMap.get(i.menu_item_id) || 0) + i.quantity))
 
       const menuItemIds = Array.from(qtyMap.keys())
       const { data: menuItems } = await supabase.from('menu_items').select('id, name').in('id', menuItemIds)
-      const nameMap = new Map(menuItems?.map((m) => [m.id, m.name]) || [])
+      const nameMap = new Map(menuItems?.map((m: any) => [m.id, m.name]) || [])
 
       const sorted = Array.from(qtyMap.entries())
-        .map(([id, qty]) => ({ name: nameMap.get(id) || 'Unknown', quantity: qty }))
+        .map(([id, qty]) => ({ name: String(nameMap.get(id) || 'Unknown'), quantity: qty }))
         .sort((a, b) => b.quantity - a.quantity)
 
       topSellers = sorted.slice(0, 5)
@@ -84,19 +84,19 @@ export async function gatherRestaurantContext(
   }
 
   const lowStockIngredients = (ingredients || [])
-    .filter((i) => i.current_stock <= i.reorder_threshold)
-    .map((i) => ({ name: i.name, current_stock: i.current_stock, threshold: i.reorder_threshold }))
+    .filter((i: any) => i.current_stock <= i.reorder_threshold)
+    .map((i: any) => ({ name: String(i.name), current_stock: Number(i.current_stock), threshold: Number(i.reorder_threshold) }))
 
   let avgTableTurnoverMinutes = 0
   if (completedOrders && completedOrders.length > 0) {
-    const totalMs = completedOrders.reduce((sum, o) => {
+    const totalMs = completedOrders.reduce((sum: any, o: any) => {
       return sum + (new Date(o.updated_at).getTime() - new Date(o.created_at).getTime())
     }, 0)
     avgTableTurnoverMinutes = Math.round(totalMs / completedOrders.length / 60000)
   }
 
   const dayCounts = new Map<string, number>()
-  weekOrders?.forEach((o) => {
+  weekOrders?.forEach((o: any) => {
     const day = new Date(o.created_at).toLocaleDateString('en-US', { weekday: 'long' })
     dayCounts.set(day, (dayCounts.get(day) || 0) + 1)
   })
@@ -111,7 +111,7 @@ export async function gatherRestaurantContext(
 
   const totalStaff = staff?.length || 0
   const tablesTotal = tables?.length || 0
-  const tablesOccupied = tables?.filter((t) => t.status === 'seated' || t.status === 'ordered').length || 0
+  const tablesOccupied = tables?.filter((t: any) => t.status === 'seated' || t.status === 'ordered').length || 0
 
   return {
     todayRevenue,

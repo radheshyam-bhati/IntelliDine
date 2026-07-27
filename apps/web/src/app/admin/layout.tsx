@@ -6,9 +6,14 @@ const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard' },
   { href: '/admin/menu', label: 'Menu' },
   { href: '/admin/inventory', label: 'Inventory' },
+  { href: '/admin/suppliers', label: 'Suppliers' },
+  { href: '/admin/purchase-orders', label: 'Purchase Orders' },
   { href: '/admin/customers', label: 'Customers' },
   { href: '/admin/staff', label: 'Staff' },
+  { href: '/admin/shifts', label: 'Shifts' },
   { href: '/admin/forecast', label: 'Forecast' },
+  { href: '/admin/campaigns', label: 'Campaigns' },
+  { href: '/admin/subscriptions', label: 'Subscriptions' },
 ]
 
 export default async function AdminLayout({

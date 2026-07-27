@@ -821,7 +821,7 @@ router.get('/inventory/low-stock/predictions', authenticate, requireRole('manage
     })
 
     predictions.sort((a, b) => {
-      const order = { critical: 0, below_threshold: 1, warning: 2, no_usage_data: 3, ok: 4 }
+      const order: Record<string, number> = { critical: 0, below_threshold: 1, warning: 2, no_usage_data: 3, ok: 4 }
       return (order[a.status] ?? 99) - (order[b.status] ?? 99)
     })
 

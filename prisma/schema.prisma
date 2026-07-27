@@ -7,6 +7,10 @@ datasource db {
   schemas  = ["intellidine"]
 }
 
+// ──────────────────────────────────────────────
+// AUTH MODELS (NextAuth)
+// ──────────────────────────────────────────────
+
 model Account {
   id                String  @id @default(uuid())
   userId            String  @db.Uuid
@@ -39,31 +43,6 @@ model Session {
   @@schema("intellidine")
 }
 
-model User {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  fullName      String? @map("full_name")
-  name          String?
-  passwordHash  String?   @map("password_hash")
-  role          String    @default("customer")
-  restaurantId  String?   @db.Uuid @map("restaurant_id")
-  phone         String?
-  createdAt     DateTime  @default(now()) @map("created_at")
-//   updatedAt     DateTime  @updatedAt
-
-  restaurant             Restaurant?            @relation(fields: [restaurantId], references: [id])
-  accounts               Account[]
-  sessions               Session[]
-  ordersAsCustomer       Order[]                @relation("OrderCustomer")
-  ordersAsCreator        Order[]                @relation("OrderCreator")
-  inventoryAdjustments   InventoryAdjustment[]
-
-  @@map("users")
-  @@schema("intellidine")
-}
-
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -74,6 +53,63 @@ model VerificationToken {
   @@schema("intellidine")
 }
 
+// ──────────────────────────────────────────────
+// USER & ORGANIZATION
+// ──────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  fullName      String?   @map("full_name")
+  name          String?
+  passwordHash  String?   @map("password_hash")
+  role          String    @default("customer")
+  restaurantId  String?   @db.Uuid @map("restaurant_id")
+  branchId      String?   @db.Uuid @map("branch_id")
+  phone         String?
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  restaurant             Restaurant?            @relation(fields: [restaurantId], references: [id])
+  branch                 Branch?                @relation(fields: [branchId], references: [id])
+  accounts               Account[]
+  sessions               Session[]
+  ordersAsCustomer       Order[]                @relation("OrderCustomer")
+  ordersAsCreator        Order[]                @relation("OrderCreator")
+  inventoryAdjustments   InventoryAdjustment[]
+  shiftAssignments       ShiftAssignment[]
+  attendanceRecords      Attendance[]
+  auditLogs              AuditLog[]
+  reviews                Review[]
+  customerFavorites      CustomerFavorite[]
+  customerAllergies      CustomerAllergy[]
+  customerPreferences    CustomerPreference[]
+  customerRewards        CustomerReward[]
+  stockTransferRequests  StockTransfer[]    @relation("StockTransferRequestedBy")
+  stockTransferApprovals StockTransfer[]    @relation("StockTransferApprovedBy")
+  recordedAttendances    Attendance[]       @relation("AttendanceRecorder")
+  wallets               Wallet[]
+  purchaseOrdersCreated  PurchaseOrder[]
+  receivingNotesCreated  ReceivingNote[]
+  assignedOrderItems     OrderItem[]
+  billsBilled           Bill[]
+  loggedWasteLogs       WasteLog[]
+  loyaltyEarnings        LoyaltyPoint[]
+  splitPayments          SplitBillPayment[]
+  notificationLogs       NotificationLog[]
+  campaignRecipients     CampaignRecipient[]
+
+  @@map("users")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// RESTAURANT / BRANCH
+// ──────────────────────────────────────────────
+
 model Restaurant {
   id                String   @id @default(uuid()) @db.Uuid
   name              String
@@ -81,28 +117,80 @@ model Restaurant {
   currency          String   @default("USD")
   taxRate           Decimal  @default(0) @map("tax_rate")
   serviceChargeRate Decimal  @default(0) @map("service_charge_rate")
+  timezone          String   @default("America/New_York")
+  logoUrl           String?  @map("logo_url")
+  coverImageUrl     String?  @map("cover_image_url")
+  phone             String?
+  email             String?
+  address           String?
+  isActive          Boolean  @default(true) @map("is_active")
   createdAt         DateTime @default(now()) @map("created_at")
 
   users               User[]
+  branches            Branch[]
   menuCategories      MenuCategory[]
   menuItems           MenuItem[]
   ingredients         Ingredient[]
+  suppliers           Supplier[]
   tables              Table[]
   orders              Order[]
   bills               Bill[]
   reservations        Reservation[]
   queueEntries        QueueEntry[]
   forecasts           Forecast[]
+  loyaltyPoints       LoyaltyPoint[]
+  purchaseOrders      PurchaseOrder[]
+  receivingNotes      ReceivingNote[]
+  wasteLogs           WasteLog[]
+  stockTransfers      StockTransfer[]
+  campaigns           Campaign[]
+  plans               SubscriptionPlan[]
+  subscriptions       RestaurantSubscription[]
+  coupons             Coupon[]
+  giftCards           GiftCard[]
+  reviews             Review[]
+  shiftDefinitions    ShiftDefinition[]
+  rewards             Reward[]
 
   @@map("restaurants")
   @@schema("intellidine")
 }
 
+model Branch {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String   @db.Uuid @map("restaurant_id")
+  name         String
+  slug         String
+  address      String?
+  phone        String?
+  email        String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  users           User[]
+  tables          Table[]
+  orders          Order[]
+  bills           Bill[]
+  reservations    Reservation[]
+  queueEntries    QueueEntry[]
+
+  @@unique([restaurantId, slug])
+  @@map("branches")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// MENU
+// ──────────────────────────────────────────────
+
 model MenuCategory {
   id           String   @id @default(uuid()) @db.Uuid
   restaurantId String   @db.Uuid @map("restaurant_id")
   name         String
+  description  String?
   displayOrder Int      @default(0) @map("display_order")
+  isActive     Boolean  @default(true) @map("is_active")
 
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   menuItems    MenuItem[]
@@ -118,21 +206,35 @@ model MenuItem {
   name               String
   description        String   @default("")
   price              Decimal
-  imageUrl           String? @map("image_url")
+  costPrice          Decimal? @map("cost_price")
+  imageUrl           String?  @map("image_url")
   dietaryTags        String[] @default([]) @map("dietary_tags")
+  allergenInfo       String?  @map("allergen_info")
+  preparationTime    Int?     @map("preparation_time")
   isAvailable        Boolean  @default(true) @map("is_available")
   isManualOverride   Boolean  @default(false) @map("is_manual_override")
-  availabilityWindow Json? @map("availability_window")
+  availabilityWindow Json?    @map("availability_window")
+  isSignature        Boolean  @default(false) @map("is_signature")
+  calories           Int?
+  spiceLevel         Int?     @map("spice_level") // 1-5
+  sortOrder          Int      @default(0) @map("sort_order")
 
   restaurant         Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   category           MenuCategory         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   ingredients        MenuItemIngredient[]
   orderItems         OrderItem[]
+  customerFavorites  CustomerFavorite[]
+  rewards            Reward[]
+  reviews            Review[]
   forecasts          Forecast[]
 
   @@map("menu_items")
   @@schema("intellidine")
 }
+
+// ──────────────────────────────────────────────
+// INVENTORY & RECIPES
+// ──────────────────────────────────────────────
 
 model Ingredient {
   id               String   @id @default(uuid()) @db.Uuid
@@ -140,12 +242,26 @@ model Ingredient {
   name             String
   unit             String
   currentStock     Decimal  @default(0) @map("current_stock")
+  minimumStock     Decimal  @default(0) @map("minimum_stock")
   reorderThreshold Decimal  @default(0) @map("reorder_threshold")
-  supplierName     String? @map("supplier_name")
+  reorderQuantity  Decimal  @default(0) @map("reorder_quantity")
+  supplierName     String?  @map("supplier_name")
+  supplierId       String?  @db.Uuid @map("supplier_id")
+  category         String?  // raw, packaged, beverage, etc.
+  storageLocation  String?  @map("storage_location")
+  unitCost         Decimal? @map("unit_cost")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   restaurant           Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier             Supplier?             @relation(fields: [supplierId], references: [id])
   menuItemIngredients  MenuItemIngredient[]
   inventoryAdjustments InventoryAdjustment[]
+  wasteLogs            WasteLog[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  receivingItems       ReceivingNoteItem[]
+  stockTransfersFrom   StockTransfer[]       @relation("TransferFromIngredient")
+  batches              Batch[]
 
   @@map("ingredients")
   @@schema("intellidine")
@@ -155,7 +271,9 @@ model MenuItemIngredient {
   id               String   @id @default(uuid()) @db.Uuid
   menuItemId       String   @db.Uuid @map("menu_item_id")
   ingredientId     String   @db.Uuid @map("ingredient_id")
-  quantityRequired Decimal @map("quantity_required")
+  quantityRequired Decimal  @map("quantity_required")
+  unit             String?  // override unit if different from ingredient default
+  isOptional       Boolean  @default(false) @map("is_optional")
 
   menuItem         MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   ingredient       Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
@@ -165,33 +283,181 @@ model MenuItemIngredient {
   @@schema("intellidine")
 }
 
+model Batch {
+  id           String   @id @default(uuid()) @db.Uuid
+  ingredientId String   @db.Uuid @map("ingredient_id")
+  batchNumber  String   @map("batch_number")
+  quantity     Decimal
+  receivedDate DateTime @default(now()) @map("received_date")
+  expiryDate   DateTime? @map("expiry_date")
+  supplierName String?  @map("supplier_name")
+  costPerUnit  Decimal? @map("cost_per_unit")
+
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  receivingItems ReceivingNoteItem[]
+
+  @@map("batches")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// SUPPLIERS & PURCHASE ORDERS
+// ──────────────────────────────────────────────
+
+model Supplier {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String   @db.Uuid @map("restaurant_id")
+  name         String
+  contactName  String?  @map("contact_name")
+  email        String?
+  phone        String?
+  address      String?
+  taxId        String?  @map("tax_id")
+  paymentTerms String?  @map("payment_terms")
+  leadTimeDays Int?     @map("lead_time_days")
+  isActive     Boolean  @default(true) @map("is_active")
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant    Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  ingredients   Ingredient[]
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+  @@schema("intellidine")
+}
+
+model PurchaseOrder {
+  id              String   @id @default(uuid()) @db.Uuid
+  restaurantId    String   @db.Uuid @map("restaurant_id")
+  supplierId      String   @db.Uuid @map("supplier_id")
+  orderNumber     String   @map("order_number")
+  status          String   @default("draft") // draft, sent, confirmed, received, cancelled
+  orderDate       DateTime @default(now()) @map("order_date")
+  expectedDate    DateTime? @map("expected_date")
+  receivedDate    DateTime? @map("received_date")
+  subtotal        Decimal  @default(0)
+  taxAmount       Decimal  @default(0) @map("tax_amount")
+  shippingCost    Decimal  @default(0) @map("shipping_cost")
+  totalAmount     Decimal  @default(0) @map("total_amount")
+  notes           String?
+  createdByUserId String?  @db.Uuid @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier   Supplier            @relation(fields: [supplierId], references: [id])
+  items           PurchaseOrderItem[]
+  receivingNotes  ReceivingNote[]
+  createdBy       User?               @relation(fields: [createdByUserId], references: [id])
+
+  @@map("purchase_orders")
+  @@schema("intellidine")
+}
+
+model PurchaseOrderItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  purchaseOrderId String  @db.Uuid @map("purchase_order_id")
+  ingredientId   String   @db.Uuid @map("ingredient_id")
+  quantityOrdered Decimal @map("quantity_ordered")
+  quantityReceived Decimal @default(0) @map("quantity_received")
+  unitCost       Decimal  @map("unit_cost")
+  totalCost      Decimal  @map("total_cost")
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  ingredient    Ingredient    @relation(fields: [ingredientId], references: [id])
+
+  @@map("purchase_order_items")
+  @@schema("intellidine")
+}
+
+model ReceivingNote {
+  id              String   @id @default(uuid()) @db.Uuid
+  restaurantId    String   @db.Uuid @map("restaurant_id")
+  purchaseOrderId String?  @db.Uuid @map("purchase_order_id")
+  receivedDate    DateTime @default(now()) @map("received_date")
+  notes           String?
+  createdByUserId String?  @db.Uuid @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  purchaseOrder PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id])
+  items         ReceivingNoteItem[]
+  createdBy     User?             @relation(fields: [createdByUserId], references: [id])
+
+  @@map("receiving_notes")
+  @@schema("intellidine")
+}
+
+model ReceivingNoteItem {
+  id              String   @id @default(uuid()) @db.Uuid
+  receivingNoteId String   @db.Uuid @map("receiving_note_id")
+  ingredientId    String   @db.Uuid @map("ingredient_id")
+  batchId         String?  @db.Uuid @map("batch_id")
+  quantityReceived Decimal @map("quantity_received")
+  unitCost        Decimal? @map("unit_cost")
+
+  receivingNote ReceivingNote @relation(fields: [receivingNoteId], references: [id], onDelete: Cascade)
+  ingredient    Ingredient    @relation(fields: [ingredientId], references: [id])
+  batch         Batch?        @relation(fields: [batchId], references: [id])
+
+  @@map("receiving_note_items")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// TABLES & FLOOR PLAN
+// ──────────────────────────────────────────────
+
 model Table {
   id           String   @id @default(uuid()) @db.Uuid
   restaurantId String   @db.Uuid @map("restaurant_id")
+  branchId     String?  @db.Uuid @map("branch_id")
   label        String
   capacity     Int      @default(4)
-  status       String   @default("empty")
+  status       String   @default("empty") // empty, seated, ordered, needs_bill, needs_cleaning, reserved
+  section      String?  // indoor, patio, bar, VIP
+  qrCodeUrl    String?  @map("qr_code_url")
+  posX         Float?   @map("pos_x")
+  posY         Float?   @map("pos_y")
+  shape        String?  @default("rectangle") // rectangle, circle, square
+  width        Float?   @default(1)
+  height       Float?   @default(1)
 
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  orders       Order[]
-  bills        Bill[]
-  reservations Reservation[]
-
+  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch          Branch?       @relation(fields: [branchId], references: [id])
+  orders          Order[]
+  bills           Bill[]
+  reservations    Reservation[]
   @@map("tables")
   @@schema("intellidine")
 }
 
+// ──────────────────────────────────────────────
+// ORDERS
+// ──────────────────────────────────────────────
+
 model Order {
   id               String   @id @default(uuid()) @db.Uuid
   restaurantId     String   @db.Uuid @map("restaurant_id")
+  branchId         String?  @db.Uuid @map("branch_id")
   tableId          String   @db.Uuid @map("table_id")
-  customerId       String? @db.Uuid @map("customer_id")
-  createdByUserId  String? @db.Uuid @map("created_by_user_id")
-  status           String   @default("placed")
+  customerId       String?  @db.Uuid @map("customer_id")
+  createdByUserId  String?  @db.Uuid @map("created_by_user_id")
+  status           String   @default("placed") // placed, received, cooking, ready, served, completed, cancelled
+  priority         String   @default("medium") // low, medium, high, urgent
+  orderType        String   @default("dine-in") // dine-in, takeaway, delivery, scheduled
+  scheduledFor     DateTime? @map("scheduled_for")
+  notes            String?
+  discountAmount   Decimal  @default(0) @map("discount_amount")
+  discountReason   String?  @map("discount_reason")
+  totalAmount      Decimal  @default(0) @map("total_amount")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt
+  completedAt      DateTime? @map("completed_at")
 
   restaurant          Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch              Branch?               @relation(fields: [branchId], references: [id])
   table               Table                 @relation(fields: [tableId], references: [id], onDelete: Cascade)
   customer            User?                 @relation("OrderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
   createdByUser       User?                 @relation("OrderCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
@@ -207,47 +473,99 @@ model OrderItem {
   orderId          String   @db.Uuid @map("order_id")
   menuItemId       String   @db.Uuid @map("menu_item_id")
   quantity         Int      @default(1)
-  specialRequest   String? @map("special_request")
-  unitPriceAtOrder Decimal @map("unit_price_at_order")
+  specialRequest   String?  @map("special_request")
+  unitPriceAtOrder Decimal  @map("unit_price_at_order")
+  status           String   @default("pending") // pending, cooking, ready, served, cancelled
+  note             String?
+  assignedChefId   String?  @db.Uuid @map("assigned_chef_id")
+  stationId        String?  @map("station_id")
+  startedAt        DateTime? @map("started_at")
+  completedAt      DateTime? @map("completed_at")
 
   order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   menuItem         MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  assignedChef     User?    @relation(fields: [assignedChefId], references: [id])
 
   @@map("order_items")
   @@schema("intellidine")
 }
 
+// ──────────────────────────────────────────────
+// BILLING & PAYMENTS
+// ──────────────────────────────────────────────
+
 model Bill {
   id                  String   @id @default(uuid()) @db.Uuid
   restaurantId        String   @db.Uuid @map("restaurant_id")
+  branchId            String?  @db.Uuid @map("branch_id")
   tableId             String   @db.Uuid @map("table_id")
   orderIds            String[] @db.Uuid @map("order_ids")
   subtotal            Decimal  @default(0)
+  discountAmount      Decimal  @default(0) @map("discount_amount")
   taxAmount           Decimal  @default(0) @map("tax_amount")
   serviceChargeAmount Decimal  @default(0) @map("service_charge_amount")
   total               Decimal  @default(0)
-  paymentStatus       String   @default("unpaid") @map("payment_status")
-  paymentReference    String? @map("payment_reference")
+  paymentStatus       String   @default("unpaid") // unpaid, partial, paid, refunded
+  paymentMethod       String?  @map("payment_method") // cash, card, upi, wallet, mixed
+  paymentReference    String?  @map("payment_reference")
+  invoiceNumber       String?  @map("invoice_number")
+  gstNumber           String?  @map("gst_number")
+  billedByUserId      String?  @db.Uuid @map("billed_by_user_id")
   createdAt           DateTime @default(now()) @map("created_at")
+  paidAt              DateTime? @map("paid_at")
 
-  restaurant          Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  table               Table      @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  restaurant    Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch        Branch?            @relation(fields: [branchId], references: [id])
+  table         Table              @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  billedBy      User?              @relation(fields: [billedByUserId], references: [id])
+  splitPayments SplitBillPayment[]
 
   @@map("bills")
   @@schema("intellidine")
 }
 
+model SplitBillPayment {
+  id         String   @id @default(uuid()) @db.Uuid
+  billId     String   @db.Uuid @map("bill_id")
+  userId     String?  @db.Uuid @map("user_id")
+  label      String   @default("Split")
+  amount     Decimal
+  items      String[] @db.Uuid // order_item_ids assigned to this split
+  paymentStatus String @default("unpaid") @map("payment_status") // unpaid, paid
+  paymentMethod String? @map("payment_method")
+  paymentReference String? @map("payment_reference")
+  createdAt  DateTime @default(now()) @map("created_at")
+  paidAt     DateTime? @map("paid_at")
+
+  bill Bill  @relation(fields: [billId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("split_bill_payments")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// RESERVATIONS & QUEUE
+// ──────────────────────────────────────────────
+
 model Reservation {
   id            String   @id @default(uuid()) @db.Uuid
   restaurantId  String   @db.Uuid @map("restaurant_id")
-  customerName  String @map("customer_name")
-  customerPhone String? @map("customer_phone")
-  partySize     Int @map("party_size")
+  branchId      String?  @db.Uuid @map("branch_id")
+  customerName  String   @map("customer_name")
+  customerPhone String?  @map("customer_phone")
+  customerEmail String?  @map("customer_email")
+  partySize     Int      @map("party_size")
   reservedFor   DateTime @map("reserved_for")
   tableId       String?  @db.Uuid @map("table_id")
-  status        String   @default("confirmed")
+  status        String   @default("confirmed") // confirmed, seated, cancelled, no_show, completed
+  notes         String?
+  specialRequests String? @map("special_requests")
+  source        String   @default("direct") // direct, phone, online, walk-in
+  createdAt     DateTime @default(now()) @map("created_at")
 
   restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch        Branch?    @relation(fields: [branchId], references: [id])
   table         Table?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
   @@map("reservations")
@@ -257,24 +575,37 @@ model Reservation {
 model QueueEntry {
   id            String   @id @default(uuid()) @db.Uuid
   restaurantId  String   @db.Uuid @map("restaurant_id")
-  customerName  String @map("customer_name")
-  customerPhone String? @map("customer_phone")
-  partySize     Int @map("party_size")
+  branchId      String?  @db.Uuid @map("branch_id")
+  customerName  String   @map("customer_name")
+  customerPhone String?  @map("customer_phone")
+  partySize     Int      @map("party_size")
+  estimatedWait Int?     @map("estimated_wait") // minutes
   joinedAt      DateTime @default(now()) @map("joined_at")
-  status        String   @default("waiting")
+  notifiedAt    DateTime? @map("notified_at")
+  status        String   @default("waiting") // waiting, notified, seated, cancelled, no_show
+  source        String   @default("direct") // direct, online
+  notes         String?
 
   restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch        Branch?    @relation(fields: [branchId], references: [id])
 
   @@map("queue_entries")
   @@schema("intellidine")
 }
 
+// ──────────────────────────────────────────────
+// INVENTORY TRACKING
+// ──────────────────────────────────────────────
+
 model InventoryAdjustment {
   id              String   @id @default(uuid()) @db.Uuid
   ingredientId    String   @db.Uuid @map("ingredient_id")
-  changeAmount    Decimal @map("change_amount")
-  reason          String
-  createdByUserId String? @db.Uuid @map("created_by_user_id")
+  changeAmount    Decimal  @map("change_amount")
+  stockAfter      Decimal? @map("stock_after")
+  reason          String   // order_deduction, manual_restock, waste_logged, correction, transfer_out, transfer_in, spoilage
+  referenceId     String?  @map("reference_id") // order_id, waste_log_id, transfer_id, etc.
+  note            String?
+  createdByUserId String?  @db.Uuid @map("created_by_user_id")
   orderId         String?  @db.Uuid @map("order_id")
   createdAt       DateTime @default(now()) @map("created_at")
 
@@ -286,13 +617,61 @@ model InventoryAdjustment {
   @@schema("intellidine")
 }
 
+model WasteLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String   @db.Uuid @map("restaurant_id")
+  ingredientId String   @db.Uuid @map("ingredient_id")
+  quantity     Decimal
+  unit         String
+  reason       String   // spoiled, expired, overproduction, trimmings, damaged, other
+  costEstimate Decimal? @map("cost_estimate")
+  notes        String?
+  loggedByUserId String? @db.Uuid @map("logged_by_user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id])
+  loggedBy   User?      @relation(fields: [loggedByUserId], references: [id])
+
+  @@map("waste_logs")
+  @@schema("intellidine")
+}
+
+model StockTransfer {
+  id              String   @id @default(uuid()) @db.Uuid
+  restaurantId    String   @db.Uuid @map("restaurant_id")
+  ingredientId    String   @db.Uuid @map("ingredient_id")
+  fromBranchId    String?  @db.Uuid @map("from_branch_id")
+  toBranchId      String?  @db.Uuid @map("to_branch_id")
+  quantity        Decimal
+  status          String   @default("pending") // pending, approved, completed, cancelled
+  notes           String?
+  requestedByUserId String? @db.Uuid @map("requested_by_user_id")
+  approvedByUserId  String? @db.Uuid @map("approved_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  completedAt     DateTime? @map("completed_at")
+
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  ingredient      Ingredient @relation("TransferFromIngredient", fields: [ingredientId], references: [id])
+  requestedBy     User?      @relation("StockTransferRequestedBy", fields: [requestedByUserId], references: [id])
+  approvedBy      User?      @relation("StockTransferApprovedBy", fields: [approvedByUserId], references: [id])
+
+  @@map("stock_transfers")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// FORECASTS
+// ──────────────────────────────────────────────
+
 model Forecast {
   id                String   @id @default(uuid()) @db.Uuid
   restaurantId      String   @db.Uuid @map("restaurant_id")
   menuItemId        String   @db.Uuid @map("menu_item_id")
   forecastDate      DateTime @db.Date @map("forecast_date")
-  predictedQuantity Decimal @map("predicted_quantity")
-  basis             String
+  predictedQuantity Decimal  @map("predicted_quantity")
+  confidence        Decimal? @default(0) // 0.0 - 1.0
+  basis             String   // cold_start_baseline, restaurant_trained, ai_enhanced
   generatedAt       DateTime @default(now()) @map("generated_at")
 
   restaurant        Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -300,5 +679,414 @@ model Forecast {
 
   @@unique([restaurantId, menuItemId, forecastDate])
   @@map("forecasts")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// CRM & CUSTOMER
+// ──────────────────────────────────────────────
+
+model CustomerFavorite {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid @map("user_id")
+  menuItemId String   @db.Uuid @map("menu_item_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, menuItemId])
+  @@map("customer_favorites")
+  @@schema("intellidine")
+}
+
+model CustomerAllergy {
+  id       String @id @default(uuid()) @db.Uuid
+  userId   String @db.Uuid @map("user_id")
+  allergen String // peanuts, gluten, dairy, shellfish, eggs, soy, etc.
+  severity String @default("medium") // mild, medium, severe
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, allergen])
+  @@map("customer_allergies")
+  @@schema("intellidine")
+}
+
+model CustomerPreference {
+  id          String @id @default(uuid()) @db.Uuid
+  userId      String @db.Uuid @map("user_id")
+  preference  String // vegetarian, vegan, gluten-free, keto, halal, etc.
+  isExcluded  Boolean @default(false) @map("is_excluded")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, preference])
+  @@map("customer_preferences")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// LOYALTY & REWARDS
+// ──────────────────────────────────────────────
+
+model LoyaltyPoint {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid @map("user_id")
+  restaurantId String @db.Uuid @map("restaurant_id")
+  points    Int
+  type      String   @default("earned") // earned, redeemed, expired, bonus
+  reference String?  // order_id, reward_id, etc.
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("loyalty_points")
+  @@schema("intellidine")
+}
+
+model Reward {
+  id            String   @id @default(uuid()) @db.Uuid
+  restaurantId  String   @db.Uuid @map("restaurant_id")
+  name          String
+  description   String?
+  pointsRequired Int     @map("points_required")
+  rewardType    String   // discount, free_item, free_delivery, gift_card
+  discountPercent Decimal? @map("discount_percent")
+  discountAmount Decimal? @map("discount_amount")
+  menuItemId    String?  @db.Uuid @map("menu_item_id")
+  isActive      Boolean  @default(true) @map("is_active")
+  startsAt      DateTime? @map("starts_at")
+  endsAt        DateTime? @map("ends_at")
+  usageLimit    Int?     @map("usage_limit")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem?   @relation(fields: [menuItemId], references: [id])
+  redemptions CustomerReward[]
+
+  @@map("rewards")
+  @@schema("intellidine")
+}
+
+model CustomerReward {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid @map("user_id")
+  rewardId  String   @db.Uuid @map("reward_id")
+  pointsUsed Int     @map("points_used")
+  status    String   @default("active") // active, used, expired
+  usedAt    DateTime? @map("used_at")
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward Reward @relation(fields: [rewardId], references: [id])
+
+  @@map("customer_rewards")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// WALLET
+// ──────────────────────────────────────────────
+
+model Wallet {
+  id       String @id @default(uuid()) @db.Uuid
+  userId   String @unique @db.Uuid @map("user_id")
+  balance  Decimal @default(0)
+
+  user        User?             @relation(fields: [userId], references: [id])
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+  @@schema("intellidine")
+}
+
+model WalletTransaction {
+  id        String   @id @default(uuid()) @db.Uuid
+  walletId  String   @db.Uuid @map("wallet_id")
+  amount    Decimal
+  type      String   // credit, debit
+  reason    String   // deposit, order_payment, refund, bonus, referral
+  reference String?  // order_id, etc.
+  balanceAfter Decimal @map("balance_after")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("wallet_transactions")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// COUPONS & GIFT CARDS
+// ──────────────────────────────────────────────
+
+model Coupon {
+  id            String   @id @default(uuid()) @db.Uuid
+  restaurantId  String   @db.Uuid @map("restaurant_id")
+  code          String   @unique
+  description   String?
+  discountType  String   // percentage, fixed_amount
+  discountValue Decimal  @map("discount_value")
+  minimumOrder  Decimal? @map("minimum_order")
+  maximumDiscount Decimal? @map("maximum_discount")
+  usageLimit    Int?     @map("usage_limit")
+  usedCount     Int      @default(0) @map("used_count")
+  isActive      Boolean  @default(true) @map("is_active")
+  startsAt      DateTime? @map("starts_at")
+  endsAt        DateTime? @map("ends_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  campaigns  Campaign[]
+
+  @@map("coupons")
+  @@schema("intellidine")
+}
+
+model GiftCard {
+  id            String   @id @default(uuid()) @db.Uuid
+  restaurantId  String   @db.Uuid @map("restaurant_id")
+  code          String   @unique
+  initialValue  Decimal  @map("initial_value")
+  currentValue  Decimal  @map("current_value")
+  purchaserName String?  @map("purchaser_name")
+  recipientName String?  @map("recipient_name")
+  recipientEmail String? @map("recipient_email")
+  message       String?
+  isActive      Boolean  @default(true) @map("is_active")
+  expiresAt     DateTime? @map("expires_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("gift_cards")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// REVIEWS & RATINGS
+// ──────────────────────────────────────────────
+
+model Review {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid @map("user_id")
+  restaurantId String  @db.Uuid @map("restaurant_id")
+  menuItemId  String?  @db.Uuid @map("menu_item_id")
+  rating      Int      // 1-5
+  title       String?
+  comment     String?
+  isApproved  Boolean  @default(false) @map("is_approved")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem?  @relation(fields: [menuItemId], references: [id])
+
+  @@map("reviews")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// STAFF MANAGEMENT
+// ──────────────────────────────────────────────
+
+model ShiftDefinition {
+  id           String @id @default(uuid()) @db.Uuid
+  restaurantId String @db.Uuid @map("restaurant_id")
+  name         String // Morning Shift, Evening Shift, etc.
+  dayOfWeek    Int    @map("day_of_week") // 0=Sunday, 1=Monday, ...
+  startTime    String @map("start_time") // HH:mm
+  endTime      String @map("end_time") // HH:mm
+  minStaff     Int    @default(1) @map("min_staff")
+  maxStaff     Int    @default(5) @map("max_staff")
+  isActive     Boolean @default(true) @map("is_active")
+
+  restaurant Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  assignments ShiftAssignment[]
+
+  @@map("shift_definitions")
+  @@schema("intellidine")
+}
+
+model ShiftAssignment {
+  id               String   @id @default(uuid()) @db.Uuid
+  shiftDefinitionId String  @db.Uuid @map("shift_definition_id")
+  userId           String   @db.Uuid @map("user_id")
+  date             DateTime @db.Date
+  startTime        String   @map("start_time") // HH:mm
+  endTime          String   @map("end_time") // HH:mm
+  role             String?  // server, kitchen, manager
+  status           String   @default("scheduled") // scheduled, confirmed, in_progress, completed, absent
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  shiftDefinition ShiftDefinition @relation(fields: [shiftDefinitionId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id])
+
+  @@map("shift_assignments")
+  @@schema("intellidine")
+}
+
+model Attendance {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @db.Uuid @map("user_id")
+  date            DateTime @db.Date
+  clockIn         DateTime? @map("clock_in")
+  clockOut        DateTime? @map("clock_out")
+  breakStart      DateTime? @map("break_start")
+  breakEnd        DateTime? @map("break_end")
+  totalHours      Decimal? @map("total_hours")
+  status          String   @default("present") // present, absent, late, half_day, on_leave
+  notes           String?
+  recordedById    String?  @db.Uuid @map("recorded_by_id")
+
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recordedBy User? @relation("AttendanceRecorder", fields: [recordedById], references: [id])
+
+  @@unique([userId, date])
+  @@map("attendance")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// SUBSCRIPTIONS
+// ──────────────────────────────────────────────
+
+model SubscriptionPlan {
+  id              String   @id @default(uuid()) @db.Uuid
+  restaurantId    String?  @db.Uuid @map("restaurant_id") // if null, system-level plan
+  name            String
+  description     String?
+  price           Decimal
+  interval        String   @default("monthly") // monthly, yearly
+  maxBranches     Int      @default(1) @map("max_branches")
+  maxStaff        Int      @default(10) @map("max_staff")
+  maxMenuItems    Int      @default(50) @map("max_menu_items")
+  features        String[] @default([]) // feature flags
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  restaurant     Restaurant?           @relation(fields: [restaurantId], references: [id])
+  subscriptions  RestaurantSubscription[]
+
+  @@map("subscription_plans")
+  @@schema("intellidine")
+}
+
+model RestaurantSubscription {
+  id              String   @id @default(uuid()) @db.Uuid
+  restaurantId    String   @unique @db.Uuid @map("restaurant_id")
+  planId          String   @db.Uuid @map("plan_id")
+  status          String   @default("active") // active, past_due, cancelled, expired, trial
+  currentPeriodStart DateTime @map("current_period_start")
+  currentPeriodEnd   DateTime @map("current_period_end")
+  trialEndsAt     DateTime? @map("trial_ends_at")
+  cancelledAt     DateTime? @map("cancelled_at")
+  stripeSubscriptionId String? @map("stripe_subscription_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  plan       SubscriptionPlan  @relation(fields: [planId], references: [id])
+
+  @@map("restaurant_subscriptions")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// MARKETING
+// ──────────────────────────────────────────────
+
+model Campaign {
+  id            String   @id @default(uuid()) @db.Uuid
+  restaurantId  String   @db.Uuid @map("restaurant_id")
+  name          String
+  description   String?
+  type          String   // email, sms, push, whatsapp, coupon
+  status        String   @default("draft") // draft, scheduled, active, completed, cancelled
+  content       String?  // message body or template
+  scheduledAt   DateTime? @map("scheduled_at")
+  sentAt        DateTime? @map("sent_at")
+  targetSegment String?  @map("target_segment") // all, repeat, at_risk, vip, new
+  statsSent     Int      @default(0) @map("stats_sent")
+  statsOpened   Int      @default(0) @map("stats_opened")
+  statsConverted Int     @default(0) @map("stats_converted")
+  couponId      String?  @db.Uuid @map("coupon_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  coupon     Coupon?             @relation(fields: [couponId], references: [id])
+  recipients CampaignRecipient[]
+
+  @@map("campaigns")
+  @@schema("intellidine")
+}
+
+model CampaignRecipient {
+  id         String   @id @default(uuid()) @db.Uuid
+  campaignId String   @db.Uuid @map("campaign_id")
+  userId     String   @db.Uuid @map("user_id")
+  sent       Boolean  @default(false)
+  opened     Boolean  @default(false)
+  converted  Boolean  @default(false)
+  sentAt     DateTime? @map("sent_at")
+  openedAt   DateTime? @map("opened_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([campaignId, userId])
+  @@map("campaign_recipients")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// NOTIFICATIONS
+// ──────────────────────────────────────────────
+
+model NotificationLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid @map("user_id")
+  type       String   // order_ready, table_ready, reservation_reminder, low_stock, bill_ready, queue_notified, campaign
+  channel    String   // email, sms, push, in_app, whatsapp
+  title      String
+  message    String
+  referenceId String? @map("reference_id")
+  status     String   @default("sent") // sent, delivered, read, failed, bounced
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("notification_logs")
+  @@schema("intellidine")
+}
+
+// ──────────────────────────────────────────────
+// AUDIT LOG
+// ──────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid @map("user_id")
+  restaurantId String? @db.Uuid @map("restaurant_id")
+  action     String   // create, update, delete, login, logout, payment, etc.
+  entity     String   // order, menu_item, ingredient, user, bill, etc.
+  entityId   String?  @map("entity_id")
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([restaurantId, createdAt])
+  @@index([entity, entityId])
+  @@map("audit_logs")
   @@schema("intellidine")
 }

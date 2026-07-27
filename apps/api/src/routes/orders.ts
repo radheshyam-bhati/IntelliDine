@@ -8,6 +8,284 @@ import { z } from 'zod'
 
 const router = Router()
 
+// ── Item-level status update (kitchen KDS) ──
+router.patch('/items/:itemId', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { itemId } = req.params
+    const schema = z.object({
+      status: z.enum(['pending', 'cooking', 'ready', 'served', 'cancelled']).optional(),
+      assigned_chef_id: z.string().uuid().nullable().optional(),
+      station_id: z.string().nullable().optional(),
+      started_at: z.string().nullable().optional(),
+    })
+    const body = schema.parse(req.body)
+
+    const { data: existing } = await supabaseAdmin
+      .from('order_items')
+      .select('*, orders!inner(restaurant_id, table_id, customer_id)')
+      .eq('id', itemId)
+      .single()
+
+    if (!existing) throw new NotFoundError('Order item not found')
+
+    const updateData: any = { ...body }
+    if (body.status === 'cooking' && !body.started_at) {
+      updateData.started_at = new Date().toISOString()
+    }
+    if (body.status === 'ready' || body.status === 'served') {
+      updateData.completed_at = new Date().toISOString()
+    }
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('order_items')
+      .update(updateData)
+      .eq('id', itemId)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    const io = req.app.get('io')
+    if (io) {
+      const { data: order } = await supabaseAdmin
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('id', existing.order_id)
+        .single()
+      if (order) {
+        io.to(`restaurant:${existing.orders.restaurant_id}:kitchen`).emit('order:updated', order)
+        io.to(`restaurant:${existing.orders.restaurant_id}:staff`).emit('order:updated', order)
+      }
+    }
+
+    res.json({ success: true, data: updated })
+  } catch (err) {
+    if (err instanceof z.ZodError) return next(new ValidationError('Validation failed', err.errors))
+    next(err)
+  }
+})
+
+// ── Merge orders from two tables ──
+router.post('/merge', authenticate, requireRole('server', 'manager'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const schema = z.object({
+      sourceTableId: z.string().uuid(),
+      targetTableId: z.string().uuid(),
+    })
+    const body = schema.parse(req.body)
+
+    const restaurantId = req.user!.restaurant_id
+    if (!restaurantId) return res.status(400).json({ success: false, error: 'No restaurant associated' })
+
+    // Get orders from source table
+    const { data: sourceOrders } = await supabaseAdmin
+      .from('orders')
+      .select('id')
+      .eq('table_id', body.sourceTableId)
+      .eq('restaurant_id', restaurantId)
+      .not('status', 'in', '("completed","cancelled")')
+
+    if (sourceOrders && sourceOrders.length > 0) {
+      const sourceIds = sourceOrders.map(o => o.id)
+      // Move all active orders to target table
+      const { error: updateError } = await supabaseAdmin
+        .from('orders')
+        .update({ table_id: body.targetTableId })
+        .in('id', sourceIds)
+      if (updateError) throw updateError
+    }
+
+    // Mark source table as empty
+    await supabaseAdmin.from('tables').update({ status: 'empty' }).eq('id', body.sourceTableId)
+    // Mark target table as ordered
+    await supabaseAdmin.from('tables').update({ status: 'ordered' }).eq('id', body.targetTableId)
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(`restaurant:${restaurantId}:staff`).emit('table:updated', { id: body.sourceTableId, status: 'empty' })
+      io.to(`restaurant:${restaurantId}:staff`).emit('table:updated', { id: body.targetTableId, status: 'ordered' })
+    }
+
+    res.json({ success: true, data: { message: 'Orders merged' } })
+  } catch (err) {
+    if (err instanceof z.ZodError) return next(new ValidationError('Validation failed', err.errors))
+    next(err)
+  }
+})
+
+// ── Transfer orders between tables ──
+router.post('/transfer', authenticate, requireRole('server', 'manager'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const schema = z.object({
+      sourceTableId: z.string().uuid(),
+      targetTableId: z.string().uuid(),
+    })
+    const body = schema.parse(req.body)
+
+    const restaurantId = req.user!.restaurant_id
+    if (!restaurantId) return res.status(400).json({ success: false, error: 'No restaurant associated' })
+
+    // Move all active orders from source to target
+    const { data: sourceOrders } = await supabaseAdmin
+      .from('orders')
+      .select('id')
+      .eq('table_id', body.sourceTableId)
+      .eq('restaurant_id', restaurantId)
+      .not('status', 'in', '("completed","cancelled")')
+
+    if (sourceOrders && sourceOrders.length > 0) {
+      const sourceIds = sourceOrders.map(o => o.id)
+      const { error: updateError } = await supabaseAdmin
+        .from('orders')
+        .update({ table_id: body.targetTableId })
+        .in('id', sourceIds)
+      if (updateError) throw updateError
+    }
+
+    // Mark source as empty
+    await supabaseAdmin.from('tables').update({ status: 'empty' }).eq('id', body.sourceTableId)
+    // Mark target as ordered
+    await supabaseAdmin.from('tables').update({ status: 'ordered' }).eq('id', body.targetTableId)
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(`restaurant:${restaurantId}:staff`).emit('table:updated', { id: body.sourceTableId, status: 'empty' })
+      io.to(`restaurant:${restaurantId}:staff`).emit('table:updated', { id: body.targetTableId, status: 'ordered' })
+    }
+
+    res.json({ success: true, data: { message: 'Orders transferred' } })
+  } catch (err) {
+    if (err instanceof z.ZodError) return next(new ValidationError('Validation failed', err.errors))
+    next(err)
+  }
+})
+
+// ── My Orders (for customer portal) ──
+router.get('/my-orders', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+
+    const { data: orders, error } = await supabaseAdmin
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('customer_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (error) throw error
+
+    // Enrich with table labels and item names
+    const enriched = await Promise.all((orders || []).map(async (order) => {
+      const { data: table } = await supabaseAdmin
+        .from('tables')
+        .select('label')
+        .eq('id', order.table_id)
+        .maybeSingle()
+
+      const itemIds = (order.order_items || []).map((oi: any) => oi.menu_item_id)
+      let itemNames: Map<string, string> = new Map()
+      if (itemIds.length > 0) {
+        const { data: items } = await supabaseAdmin
+          .from('menu_items')
+          .select('id, name')
+          .in('id', itemIds)
+        if (items) items.forEach((i) => itemNames.set(i.id, i.name))
+      }
+
+      return {
+        ...order,
+        tableLabel: table?.label || null,
+        items: (order.order_items || []).map((oi: any) => ({
+          ...oi,
+          name: itemNames.get(oi.menu_item_id) || 'Item',
+        })),
+      }
+    }))
+
+    res.json({ success: true, data: enriched })
+  } catch (err) { next(err) }
+})
+
+// ── Quick Order (create order for specific table with items) ──
+router.post('/quick', authenticate, requireRole('server', 'manager'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const schema = z.object({
+      tableId: z.string().uuid(),
+      notes: z.string().max(500).nullable().optional(),
+      items: z.array(z.object({
+        menuItemId: z.string().uuid(),
+        quantity: z.number().int().positive(),
+      })).min(1),
+    })
+    const body = schema.parse(req.body)
+
+    const restaurantId = req.user!.restaurant_id
+    if (!restaurantId) return res.status(400).json({ success: false, error: 'No restaurant associated' })
+
+    // Validate menu items
+    const itemIds = body.items.map(i => i.menuItemId)
+    const { data: menuItems } = await supabaseAdmin
+      .from('menu_items')
+      .select('id, price, is_available')
+      .in('id', itemIds)
+
+    if (!menuItems || menuItems.length !== itemIds.length) {
+      throw new ValidationError('Some menu items not found')
+    }
+
+    const unavailable = menuItems.filter(m => !m.is_available)
+    if (unavailable.length > 0) {
+      throw new ValidationError('Some items are unavailable', { ids: unavailable.map(m => m.id) })
+    }
+
+    const priceMap = new Map(menuItems.map(m => [m.id, m.price]))
+
+    // Create order
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .insert({
+        restaurant_id: restaurantId,
+        table_id: body.tableId,
+        created_by_user_id: req.user!.id,
+        status: 'placed',
+        notes: body.notes || null,
+      })
+      .select()
+      .single()
+    if (orderError) throw orderError
+
+    // Create order items
+    const orderItems = body.items.map(item => ({
+      order_id: order.id,
+      menu_item_id: item.menuItemId,
+      quantity: item.quantity,
+      unit_price_at_order: priceMap.get(item.menuItemId) || 0,
+    }))
+
+    const { data: items, error: itemsError } = await supabaseAdmin
+      .from('order_items')
+      .insert(orderItems)
+      .select()
+    if (itemsError) throw itemsError
+
+    // Update table status
+    await supabaseAdmin.from('tables').update({ status: 'ordered' }).eq('id', body.tableId)
+
+    await processOrderDeduction(order.id, supabaseAdmin, req.app.get('io'))
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(`restaurant:${restaurantId}:kitchen`).emit('order:created', { ...order, items })
+      io.to(`restaurant:${restaurantId}:staff`).emit('order:created', { ...order, items })
+    }
+
+    res.status(201).json({ success: true, data: { ...order, items } })
+  } catch (err) {
+    if (err instanceof z.ZodError) return next(new ValidationError('Validation failed', err.errors))
+    next(err)
+  }
+})
+
 router.post('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = createOrderSchema.parse(req.body)
