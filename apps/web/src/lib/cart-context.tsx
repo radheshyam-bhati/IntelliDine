@@ -11,7 +11,7 @@ export interface CartItem {
 
 interface CartContextValue {
   items: CartItem[]
-  addItem: (item: MenuItem, quantity?: number) => void
+  addItem: (item: MenuItem, quantity?: number, specialRequest?: string) => void
   removeItem: (itemId: string) => void
   updateQuantity: (itemId: string, quantity: number) => void
   clearCart: () => void
@@ -24,12 +24,16 @@ const CartContext = createContext<CartContextValue | null>(null)
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
 
-  const addItem = useCallback((menuItem: MenuItem, quantity = 1) => {
+  const addItem = useCallback((menuItem: MenuItem, quantity = 1, specialRequest?: string) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.menuItem.id === menuItem.id)
+      if (specialRequest) {
+        // If there's a special request, add as a new line item (can't merge different requests)
+        return [...prev, { menuItem, quantity, specialRequest }]
+      }
+      const existing = prev.find((i) => i.menuItem.id === menuItem.id && !i.specialRequest)
       if (existing) {
         return prev.map((i) =>
-          i.menuItem.id === menuItem.id
+          i.menuItem.id === menuItem.id && !i.specialRequest
             ? { ...i, quantity: i.quantity + quantity }
             : i
         )
