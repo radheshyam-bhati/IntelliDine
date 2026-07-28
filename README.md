@@ -2,6 +2,8 @@
 
 **Real-time Restaurant Management System**
 
+**Live Demo:** [https://intelli-dine-web.vercel.app/login](https://intelli-dine-web.vercel.app/login)
+
 **Team Name:** radheshyambhati747
 
 IntelliDine is a full-stack restaurant management platform that streamlines operations across the front-of-house, kitchen, and management teams. Built with a monorepo architecture for modular development and deployment.
