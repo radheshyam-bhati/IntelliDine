@@ -1,0 +1,6 @@
+{
+  "description": "IntelliDine - an AI-powered restaurant discovery and ordering platform. Built with a full-stack TypeScript/JavaScript frontend and Python/MySQL backend, with a polished UI/UX and a live demo on Vercel.",
+  "demo": "https://intelli-dine-web.vercel.app/login",
+  "category": "AI & Web",
+  "priority": 1
+}
